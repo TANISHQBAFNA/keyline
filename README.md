@@ -40,6 +40,8 @@ You don’t need to be a developer. If you can clone a GitHub repo and paste a F
 
 ### 1. Get the project
 
+Needs Node 22.12 or newer.
+
 ```bash
 git clone https://github.com/TANISHQBAFNA/keyline.git
 cd keyline
@@ -109,6 +111,7 @@ Most designers should use **Figma MCP** only.
 - Architecture notes: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)  
 - How tools plug in: [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md)  
 - Cursor-focused steps: [`docs/CURSOR-KEYLINE.md`](docs/CURSOR-KEYLINE.md)  
+- Toolchain versions (Vite 8, React 19, Vitest 5): [`CHANGELOG.md`](CHANGELOG.md)  
 
 License: [`LICENSE`](LICENSE) (MIT)
 

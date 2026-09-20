@@ -9,6 +9,8 @@ Everyday flow for using Keyline inside Cursor when building Figma screens from a
 
 ## Install / build
 
+Needs Node `^22.12` or `>=24` (Vitest 5). Then:
+
 ```bash
 npm install
 npm run build:server
