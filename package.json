@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Keyline — one-node Figma component usage map for Cursor agents.",
+  "description": "Keyline \u2014 one-node Figma component usage map for Cursor agents.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build && vite build --config vite.server.config.ts",
@@ -36,5 +36,6 @@
     "typescript": "^5.6.3",
     "vite": "^5.4.10",
     "vitest": "^2.1.4"
-  }
+  },
+  "license": "MIT"
 }
