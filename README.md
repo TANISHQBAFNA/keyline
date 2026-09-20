@@ -1,4 +1,6 @@
-# Figma Graphify
+# Keyline
+
+> Formerly / also known as **Figma Graphify**. Repo: [TANISHQBAFNA/keyline](https://github.com/TANISHQBAFNA/keyline).
 
 Turn any Figma file into an explorable relationship graph: pages, sections,
 frames, components, instances, variants, styles, variables, libraries and
@@ -46,26 +48,39 @@ npm test
 npm run typecheck
 ```
 
-## Install as an agent plugin
+## Install for Claude, Codex, Cursor (and similar)
 
-This repo is the plugin. Add it to Cursor, Claude Code, or Codex, then paste a Figma **screen / frame / section** link. The agent maps that node — not the whole file.
+Product name is **Keyline**. Clone the public repo, build the CLI once, then point your AI tool at this folder.
+
+```bash
+git clone https://github.com/TANISHQBAFNA/keyline.git
+cd keyline
+npm install
+npm run build:server
+```
 
 | Tool | How |
 |---|---|
-| **Cursor** | Open this repo (or add it to the chat). Skill at `.cursor/skills/figma-graphify`. MCP in `.cursor/mcp.json`. |
-| **Claude Code** | `claude --plugin-dir /path/to/figma-graphify` after `npm run build:server`. Manifest: `.claude-plugin/plugin.json`. |
-| **Codex** | Point the session at this repo. `AGENTS.md` + `skills/figma-graphify/SKILL.md`. |
+| **Cursor** | Open the cloned repo (or add it to the chat). Prefer skill `skills/keyline`. Also: `.cursor/skills/figma-graphify`, MCP in `.cursor/mcp.json`. |
+| **Claude Code** | From the repo root: `claude --plugin-dir .` after `npm run build:server`. Manifest: `.claude-plugin/plugin.json`. |
+| **Codex / other agents** | Point the session at the repo root. Read `AGENTS.md` + `skills/keyline/SKILL.md`. |
+
+### Everyday agent flow
+
+1. Ingest a Figma **screen / frame / section** link (not a whole-file dump unless you ask for it).
+2. `npm run keyline -- resolve "Component Name"` for each master you will place.
+3. Draw in Figma using the returned `figmaNodeId` only.
+4. **Do not Read** `.graphify/graph.json` — resolve is the cheap path.
 
 ```bash
-npm install
-npm run build:server
-export FIGMA_ACCESS_TOKEN=figd_…
-npm run graphify -- ingest 'https://www.figma.com/design/<fileKey>/Name?node-id=1-2'
+export FIGMA_ACCESS_TOKEN=figd_…   # for live ingest
+npm run keyline -- ingest 'https://www.figma.com/design/<fileKey>/Name?node-id=1-2'
+npm run keyline -- resolve "Navbar"
 ```
 
-No `node-id` (whole file): each top-level FRAME/SECTION is fetched separately. Slower. `--scope file` is the one-shot dump.
+No `node-id` (whole file): each top-level FRAME/SECTION is fetched separately (slower). `--scope file` is the one-shot dump.
 
-Agents: `resolve "<component>"` (usage card), then Figma on that `figmaNodeId`. Do not Read `graph.json`. Skill: `skills/figma-graphify/SKILL.md`.
+Prefer the **`keyline`** script over any `graphify` alias when both exist.
 
 Humans: `npm run dev` → **Load Figma** (PAT stays in this tab).
 
