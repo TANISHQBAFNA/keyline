@@ -2,9 +2,18 @@
 
 > [github.com/TANISHQBAFNA/keyline](https://github.com/TANISHQBAFNA/keyline)
 
-**Keyline helps your AI (Claude, Cursor, Codex, and similar) use your real Figma components — without pasting the whole file into chat.**
+**You set the design rules. AI builds inside them — faster and more accurately.**
 
-You point it at a screen. It remembers what’s on that screen. Then the AI can ask “where is this button used?” and get a short answer, not a giant dump.
+The real power of Keyline: a human designer defines the UI guidelines, components, and usage scope. AI tools (Claude, Cursor, Codex, and similar) use that map to create screens without inventing a new system every time.
+
+**The loop**
+
+1. **You** set rules, guidelines, and what may be used  
+2. **Keyline** holds the map of your Figma library  
+3. **AI** drafts screens from those masters  
+4. **You** judge taste  
+
+So Keyline is not “AI that designs.” It is **your rules, made easy for AI to follow** — without pasting the whole Figma file into chat.
 
 MIT licensed. Free to use.
 
@@ -12,7 +21,7 @@ MIT licensed. Free to use.
 
 ## Who this is for
 
-Designers who work with AI tools and want the AI to respect your existing Figma library — not invent random UI.
+Designers who work with AI and want the AI to respect their library and guidelines — not invent random UI.
 
 You don’t need to be a developer. If you can clone a GitHub repo and paste a Figma link, you’re fine.
 
@@ -20,9 +29,10 @@ You don’t need to be a developer. If you can clone a GitHub repo and paste a F
 
 ## What you get
 
-1. **Short answers** — “this component appears on these screens” in a small card  
-2. **Safer drawing** — the AI gets the right Figma component id, so it builds from your masters  
-3. **Less mess** — the AI should not read the huge saved map file; it should ask Keyline instead  
+1. **Your rules in charge** — AI works from your components and usage scope  
+2. **Faster screen drafts** — less guessing, more reuse  
+3. **Short answers** — “what is this / where is it used?” in a small card, not a giant dump  
+4. **Safer drawing** — AI gets the right Figma component id for your masters  
 
 ---
 
