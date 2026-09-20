@@ -1,0 +1,16 @@
+export const imgFactory = "https://www.figma.com/api/mcp/asset/ed2efa54-2744-47f6-b83a-9c490ddfa63f.png";
+export const imgPlus = "https://www.figma.com/api/mcp/asset/298aeba5-980d-475e-b28e-efed5a65c269.svg";
+export const imgBankNote = "https://www.figma.com/api/mcp/asset/9810b9db-e0b4-44d6-b27e-eda057abc062.svg";
+export const imgTrendUp = "https://www.figma.com/api/mcp/asset/13dc1e43-2ee1-476f-8cc5-b42b0c4efef3.svg";
+export const imgCpuChip = "https://www.figma.com/api/mcp/asset/6525ac73-5a63-47a9-b817-4fc90901bc7d.svg";
+export const imgCellular = "https://www.figma.com/api/mcp/asset/4171bff3-42e0-4751-8e39-ce58ddeb3f86.svg";
+export const imgWifi = "https://www.figma.com/api/mcp/asset/64de1cde-42ac-4421-b681-d8ce7d08d44d.svg";
+export const imgBattery = "https://www.figma.com/api/mcp/asset/d224763f-f959-4f1f-82c9-f6d14029cd56.svg";
+export const imgChevronDown = "https://www.figma.com/api/mcp/asset/01304437-a396-4e2f-86c7-29eaa73adb5d.svg";
+export const imgSearch = "https://www.figma.com/api/mcp/asset/dc661f7f-80b7-4498-af4d-ddf95c3733a0.svg";
+export const imgSliders = "https://www.figma.com/api/mcp/asset/77de3990-9ec8-4548-9b47-cec315ff597b.svg";
+export const imgHome = "https://www.figma.com/api/mcp/asset/bc5e8b8a-274a-45a3-9913-ed0c42331ebf.svg";
+export const imgBank = "https://www.figma.com/api/mcp/asset/9accedf4-779e-40b1-b492-a9afd9b753a1.svg";
+export const imgCreditCard = "https://www.figma.com/api/mcp/asset/c531a7dc-1968-494f-82bb-fc6b5472e1f8.svg";
+export const imgPiggyBank = "https://www.figma.com/api/mcp/asset/e00e9c67-1446-4582-8866-e67ed9b24cf2.svg";
+export const imgCoins = "https://www.figma.com/api/mcp/asset/9d6efc0a-618c-4c5b-992e-33896b1895c3.svg";

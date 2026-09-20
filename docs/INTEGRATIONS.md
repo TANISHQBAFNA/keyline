@@ -1,0 +1,252 @@
+# Integration guide
+
+Everything below plugs into an existing seam. None of it requires changing the
+graph model, the query layer or the UI.
+
+## The two seams
+
+```
+                      ┌──────────────────────────────┐
+  new data source ───▶│ IngestionSource.load()        │──▶ SourceDocument ──▶ (unchanged)
+                      └──────────────────────────────┘
+
+                      ┌──────────────────────────────┐
+  new AI provider ◀───│ LlmProvider.complete()        │◀── LlmRequest{ AiGraphContext }
+                      └──────────────────────────────┘
+```
+
+- To add a **data source**, implement `IngestionSource` (`core/ingestion/types.ts`).
+- To add an **AI provider**, implement `LlmProvider` (`core/ai/provider.ts`).
+
+---
+
+## 1. Figma REST API — shipped
+
+Parsing was already in `adaptFigmaRestFile`. Live fetch is
+`FigmaRestIngestionSource` / `fetchFigmaRestDocument`.
+
+**Agent path (preferred).** Ingest once into `.graphify/graph.json`. Call `resolve` for a usage card, then Figma on that `figmaNodeId`. Do not Read the graph file.
+
+```bash
+export FIGMA_ACCESS_TOKEN=figd_…
+npm run build:server
+npm run graphify -- ingest 'https://www.figma.com/design/<fileKey>/<name>?node-id=1-2'
+```
+
+Paste the shared screen/frame/section URL. `node-id` is the ingest scope. No `node-id`: each top-level screen, one request at a time. `--scope file` dumps the whole tree.
+
+**Human path.** Dev UI **Load Figma** — PAT + URL. Token stays in
+`sessionStorage`. Vite proxies `/api/figma` → `https://api.figma.com` so the
+browser can call REST at all.
+
+**Tokens.** Never commit a PAT. Never write it into `graph.json`. CLI reads
+`FIGMA_ACCESS_TOKEN` (or `FIGMA_TOKEN`). UI never puts the token in the bundle.
+
+**Scope.** Shared links hit `GET /v1/files/:key/nodes?ids=`. Whole-file ingest
+outlines with `?depth=2`, then fetches each top-level FRAME/SECTION. Empty
+outline (component-library pages) falls back to one `GET /v1/files/:key`.
+
+**Thumbnails.** `GET /v1/images/:key?ids=a,b,c&format=png&scale=1` in batches;
+write the URLs onto `GraphNode.thumbnailUrl`. Rate-limited — do it lazily for
+nodes that are actually rendered or inspected.
+
+---
+
+## 2. Figma plugin — shipped
+
+Built, in `figma-plugin/`. Plain JavaScript, no build step: import
+`figma-plugin/manifest.json` through **Plugins → Development → Import plugin
+from manifest…** and run it.
+
+It emits a `SourceDocument` directly, so `JsonIngestionSource` validates it
+against `SourceDocumentSchema` and skips the adapter layer entirely. Running
+in-document closes every gap the other two sources have:
+
+| | REST | MCP `get_metadata` | Plugin |
+|---|---|---|---|
+| Instance → main component | exact | inferred from name | **exact** |
+| Variables | Enterprise endpoint | names only | **`figma.variables`, no plan gate** |
+| Prototype interactions | one per node | none | **every reaction** |
+| Dev-mode annotations | inconsistent | none | **`node.annotations`** |
+| Auth | access token | Figma desktop | **none** |
+
+See `figma-plugin/README.md` for scope options and the local POST receiver.
+
+## 2b. Plugin internals (for reference)
+
+A plugin runs inside Figma with the full document in memory, which fixes three
+of the REST limitations at once: real `reactions` (multi-action prototyping),
+dev-mode annotations, and — via `figma.variables` — variables without an
+Enterprise plan.
+
+The plugin's job is to emit a `SourceDocument`, not to know anything about the
+graph:
+
+```ts
+// plugin/code.ts (runs in Figma)
+figma.ui.postMessage({ type: "source-document", payload: buildSourceDocument() });
+```
+
+```ts
+// src/core/ingestion/adapters/pluginSource.ts (runs in the app)
+export class FigmaPluginIngestionSource implements IngestionSource {
+  readonly kind = "figma-plugin" as const;
+  /* resolves on the postMessage above; validate with SourceDocumentSchema */
+}
+```
+
+Because the plugin can set `libraryId` on remote components and styles,
+limitation #3 in `ARCHITECTURE.md` disappears and `SOURCED_FROM_LIBRARY` starts
+grouping by real library instead of one catch-all node — with no change to the
+transform.
+
+---
+
+## 3. Figma MCP — shipped
+
+`core/ingestion/adapters/figmaMcp.ts` turns the Dev Mode MCP server's
+`get_metadata` XML and `get_variable_defs` map into a `SourceDocument`. It needs
+no token and no Enterprise plan — just the Figma desktop app with
+**Preferences → Enable Dev Mode MCP Server** turned on.
+
+`get_metadata` is the cheapest structural view Figma exposes: ids, layer types,
+names, positions, sizes, nothing else. That is precisely the trade this product
+is built on — enough to construct a traversable graph, at a fraction of the
+cost of a design payload.
+
+### Capturing a file
+
+```bash
+curl -s -X POST http://127.0.0.1:3845/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
+        "name":"get_metadata","arguments":{"nodeId":"14430:56021"}}}'
+```
+
+Feed the result to `adaptFigmaMcpMetadata({ fileKey, fileName, metadataXml,
+variableDefs })`. `CapturedMcpIngestionSource` wraps a stored capture so the
+same adapter runs in tests and in the browser; a live source is the same call
+against a running server.
+
+### What MCP metadata cannot tell you
+
+| Gap | Handling |
+|---|---|
+| No `componentId` on instances | Identity inferred from instance name, every such component tagged `identity: "inferred-from-name"` and reported as an `INFERRED_COMPONENT_IDENTITY` warning. Re-ingesting over REST replaces it with exact ids. |
+| No per-node variable bindings | `get_variable_defs` returns subtree-wide tokens keyed by name. They attach to the queried root rather than being invented onto children. |
+| No file or page context | The graph roots at the queried node. Page/section context arrives with a REST or plugin ingest. |
+| No prototype data | `PROTOTYPES_TO` needs REST or the plugin API. |
+| Variables and styles arrive in one flat map | Split by value shape: `Effect(…)` → effect style, `Font(…)` → text style, `""` → paint style, `#rrggbb` → colour variable, numeric → float, else string. |
+
+Because every inference is tagged, an agent reading the graph can tell exactly
+which relationships are load-bearing and which are best-effort.
+
+### Serving the graph *to* MCP
+
+The more interesting direction: expose this graph as MCP tools so an agent can
+traverse it instead of re-reading the file. Each tool is a thin wrapper over
+`GraphIndex` and returns already-small payloads.
+
+| Tool | Implementation |
+|---|---|
+| `find_nodes(query)` | `searchNodes(index, query)` — the same query language as the UI |
+| `get_node(id)` | `index.getNode(id)` + `usageSummaryFor` |
+| `get_hierarchy_path(id)` | `index.getHierarchyPath(id)` |
+| `get_component_usage(id)` | `computeComponentUsage(index, node)` |
+| `get_subgraph(id, level, viewMode)` | `extractSubgraph(index, {...})` |
+| `get_ai_context(id, budget)` | `buildAiGraphContext(index, id, { nodeBudget })` |
+
+`get_ai_context` is the one that matters: it is already capped, already
+compacted, and already excludes materialised inverse edges.
+
+### Why this is the point of the product
+
+Measured on the CBX300 Portfolio screen (87 instances, 224 graph nodes):
+
+| Question | Without the graph | With the graph |
+|---|---|---|
+| "What components are on this screen, and how often?" | re-read 14,394 chars of `get_metadata`, then derive it | **586 chars** — an index lookup that already contains the answer |
+| "Where is `Main Card` used?" | re-read 14,394 chars, then derive it | **4,124 chars** of bounded subgraph, answer included |
+| Whole graph as JSON | — | 174,332 chars, **never sent** |
+
+An agent that re-reads the file pays the full cost on every question and
+re-derives the same relationships each time. An agent that traverses the graph
+pays once at ingest, then answers from indexes. A regression test asserts a
+targeted answer never costs more than half of the source it came from.
+
+---
+
+## 4. Claude / OpenAI-compatible providers (Phase 4)
+
+Implement `LlmProvider`:
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+import type { LlmProvider, LlmRequest, LlmResponse } from "@/core/ai";
+
+export class AnthropicProvider implements LlmProvider {
+  readonly id = "anthropic";
+  readonly label = "Claude";
+
+  constructor(private readonly client: Anthropic, private readonly model = "claude-opus-5") {}
+
+  async complete(request: LlmRequest, signal?: AbortSignal): Promise<LlmResponse> {
+    const system = request.messages.find((m) => m.role === "system")?.content;
+    const messages = request.messages
+      .filter((m) => m.role !== "system")
+      .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+
+    const response = await this.client.messages.create(
+      { model: this.model, max_tokens: request.maxOutputTokens ?? 2048, system, messages },
+      { signal },
+    );
+
+    const text = response.content
+      .filter((block) => block.type === "text")
+      .map((block) => block.text)
+      .join("\n");
+    return { text, raw: response };
+  }
+}
+```
+
+An OpenAI-compatible provider is the same shape against `/v1/chat/completions`.
+API keys belong on a server, not in the bundle — the same proxy that fronts the
+Figma token should front the model call.
+
+**The payload contract is fixed regardless of provider.** `AI_ACTIONS` supplies
+the task text, `buildActionRequest` assembles the messages, and
+`buildAiGraphContext` bounds the data. A provider never sees the whole graph,
+because it is never handed the whole graph.
+
+## 5. Cursor / Claude Code handoff (works today)
+
+The `handoff-context` action in the AI panel produces a markdown payload that
+already contains the component tree, the design-system mapping and the Figma
+deep links for the selected subgraph. Copy it into Cursor or Claude Code as-is.
+
+For a tighter loop, write the payload to a file the agent already reads:
+
+```ts
+import { buildAiGraphContext, toMarkdownPrompt, AI_ACTIONS } from "@/core/ai";
+
+const context = buildAiGraphContext(index, focusId, { nodeBudget: 80 });
+const action = AI_ACTIONS.find((a) => a.id === "handoff-context")!;
+await writeFile(".cursor/figma-context.md", toMarkdownPrompt(context!, action.task));
+```
+
+Pair this with Figma Code Connect and the payload gains the last missing
+mapping — main component → source file — which turns "which components are on
+this screen" into "which files do I open".
+
+## 6. Adding a node type or an edge type
+
+1. Add the literal to `NODE_TYPES` / `EDGE_TYPES` in `core/model`.
+2. Add its category in `NODE_CATEGORY_BY_TYPE` (colour follows automatically).
+3. Emit it in `buildGraph`.
+4. Add a glyph and shape in `ui/nodeVisuals.ts`.
+5. If it needs a reverse index, add it in `GraphIndex`'s constructor switch.
+
+Levels, filters, search, the browser and the AI payload all pick it up without
+further changes.

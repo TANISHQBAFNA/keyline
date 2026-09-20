@@ -1,0 +1,83 @@
+{
+  "arm": "B",
+  "run": 4,
+  "status": "complete",
+  "task": "Pay now screen",
+  "filesWritten": [
+    "eval/run-4/arm-b/PayNowScreen.tsx",
+    "eval/run-4/arm-b/Header.tsx",
+    "eval/run-4/arm-b/MainCard.tsx",
+    "eval/run-4/arm-b/Heading.tsx",
+    "eval/run-4/arm-b/Amount.tsx",
+    "eval/run-4/arm-b/InputField.tsx",
+    "eval/run-4/arm-b/SpecialButton.tsx",
+    "eval/run-4/arm-b/BottomNavbar.tsx",
+    "eval/run-4/arm-b/TOOL_LOG.json"
+  ],
+  "componentsPresent": {
+    "Header": true,
+    "MainCard": true,
+    "Heading": true,
+    "Amount": true,
+    "InputField": true,
+    "SpecialButton": true,
+    "BottomNavbar": true
+  },
+  "clonedExistingScreen": false,
+  "graphReadFirst": false,
+  "resolvedFirst": true,
+  "calls": [
+    {
+      "tool": "resolve",
+      "notes": "Main Card",
+      "figmaNodeId": "mcp-name:Main Card",
+      "responseChars": 1307
+    },
+    {
+      "tool": "resolve",
+      "notes": "Header",
+      "figmaNodeId": "mcp-name:Header",
+      "responseChars": 844
+    },
+    {
+      "tool": "resolve",
+      "notes": "Heading",
+      "figmaNodeId": "mcp-name:Heading",
+      "responseChars": 849
+    },
+    {
+      "tool": "resolve",
+      "notes": "Amount",
+      "figmaNodeId": "mcp-name:Amount",
+      "responseChars": 600
+    },
+    {
+      "tool": "resolve",
+      "notes": "Input Field",
+      "figmaNodeId": "mcp-name:Input Field",
+      "responseChars": 750
+    },
+    {
+      "tool": "resolve",
+      "notes": "Special Button",
+      "figmaNodeId": "mcp-name:Special Button",
+      "responseChars": 870
+    },
+    {
+      "tool": "resolve",
+      "notes": "Bottom Navbar",
+      "figmaNodeId": "mcp-name:Bottom Navbar",
+      "responseChars": 740
+    },
+    {
+      "tool": "GetDynamicTools",
+      "notes": "schema discovery before Figma; figma namespace missing. available: cursor, cursor-app-control, cursor-ide-browser, user-open-design",
+      "responseChars": 12100
+    },
+    {
+      "tool": "get_design_context",
+      "notes": "after resolve; nodeId mcp-name:Header (card MAIN_COMPONENT). not 10662:32630/35460/40879. server missing: MCP server does not exist: figma",
+      "responseChars": 108
+    }
+  ]
+}

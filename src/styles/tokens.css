@@ -1,0 +1,69 @@
+:root {
+  color-scheme: dark;
+
+  --bg: #0d1017;
+  --bg-panel: #12161f;
+  --bg-raised: #171d28;
+  --bg-hover: #1d2431;
+  --border: #242c3a;
+  --border-strong: #33405a;
+
+  --text: #e6ebf5;
+  --text-muted: #8b97ad;
+  --text-dim: #64708a;
+
+  /* Semantic categories. Colour = meaning, never decoration. */
+  --cat-structure: #5b9dff;
+  --cat-component: #b489ff;
+  --cat-foundation: #3fbf9a;
+  --cat-interaction: #ff9550;
+
+  --edge-structure: #3f5f92;
+  --edge-component: #7d5cc0;
+  --edge-foundation: #2c8f74;
+  --edge-interaction: #c2703a;
+
+  --accent: #5b9dff;
+  --warn: #ffb454;
+  --danger: #ff6b6b;
+
+  --grid-dot: #1b2230;
+  --minimap-mask: rgba(13, 16, 23, 0.78);
+
+  --radius: 8px;
+  --shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  --font: ui-sans-serif, -apple-system, "Segoe UI", Inter, system-ui, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+}
+
+/* Node type -> category accent. */
+.cat-FILE,
+.cat-PAGE,
+.cat-SECTION,
+.cat-FRAME,
+.cat-AUTO_LAYOUT_CONTAINER,
+.cat-GROUP,
+.cat-LAYER,
+.cat-TEXT_LAYER,
+.cat-MEDIA_LAYER {
+  --node-accent: var(--cat-structure);
+}
+
+.cat-COMPONENT_SET,
+.cat-MAIN_COMPONENT,
+.cat-VARIANT,
+.cat-COMPONENT_INSTANCE {
+  --node-accent: var(--cat-component);
+}
+
+.cat-STYLE,
+.cat-VARIABLE,
+.cat-VARIABLE_COLLECTION,
+.cat-EXTERNAL_LIBRARY {
+  --node-accent: var(--cat-foundation);
+}
+
+.cat-PROTOTYPE_INTERACTION,
+.cat-ANNOTATION {
+  --node-accent: var(--cat-interaction);
+}

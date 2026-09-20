@@ -1,0 +1,13 @@
+node_modules
+dist
+dist-server
+.DS_Store
+*.local
+.env
+.env.*
+coverage
+.graphify
+test-results
+playwright-report
+blob-report
+playwright/.cache

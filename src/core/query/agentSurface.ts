@@ -1,0 +1,710 @@
+import { buildAiGraphContext, toMarkdownPrompt } from "@/core/ai";
+import type { GraphNode } from "@/core/model";
+import { computeAnalytics, computeComponentUsage, type GraphAnalytics } from "./analytics";
+import { detectCommunitiesForIndex } from "./communities";
+import type { GraphIndex } from "./GraphIndex";
+import { searchNodes } from "./search";
+import { extractSubgraph, levelForNode } from "./subgraph";
+
+/**
+ * Agent-facing graph surface. Graph stays on disk. Agents call resolve /
+ * check_frame / get_screen_inventory — never Read graph.json.
+ * Every MCP payload carries a char cost.
+ */
+
+export interface AgentCost {
+  chars: number;
+  approxTokens: number;
+}
+
+export interface OrientBrief {
+  file: { name: string; key: string; sourceKind: string };
+  totals: GraphAnalytics["totals"];
+  godNodes: Array<{ id: string; name: string; type: string; degree: number }>;
+  communities: Array<{ name: string; size: number; hub: string }>;
+  health: {
+    unusedComponents: number;
+    unresolvedInstances: number;
+    framesWithoutComponents: number;
+  };
+  askNext: string[];
+  hint: string;
+}
+
+const briefNode = (node: GraphNode) => ({
+  id: node.id,
+  name: node.name,
+  type: node.type,
+  figmaNodeId: node.figmaNodeId,
+  status: node.status,
+  owner: node.owner,
+});
+
+export function costOf(value: unknown): AgentCost {
+  const chars = JSON.stringify(value).length;
+  return { chars, approxTokens: Math.ceil(chars / 4) };
+}
+
+export function withCost<T extends object>(payload: T): T & { cost: AgentCost } {
+  return { ...payload, cost: costOf(payload) };
+}
+
+const STOPWORDS = new Set([
+  "a",
+  "an",
+  "the",
+  "page",
+  "screen",
+  "frame",
+  "what",
+  "which",
+  "kind",
+  "of",
+  "to",
+  "for",
+  "should",
+  "use",
+  "uses",
+  "using",
+  "i",
+  "im",
+  "am",
+  "building",
+  "build",
+  "requires",
+  "require",
+  "need",
+  "needs",
+  "this",
+  "that",
+  "our",
+  "new",
+  "and",
+  "or",
+  "not",
+  "how",
+  "does",
+  "with",
+  "from",
+  "between",
+  "find",
+  "search",
+]);
+
+const stem = (word: string) =>
+  word.length > 3 && word.endsWith("s") ? word.slice(0, -1) : word;
+
+const tokensOf = (text: string): string[] =>
+  text
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((part) => part.length > 1 && !STOPWORDS.has(part))
+    .map(stem);
+
+const isScreen = (index: GraphIndex, node: GraphNode): boolean => {
+  if (node.type !== "FRAME") return false;
+  const parent = index.getParent(node.id);
+  return parent?.type === "PAGE" || parent?.type === "SECTION" || parent?.type === "FILE";
+};
+
+const overlap = (name: string, tokens: string[]): number => {
+  const names = new Set(tokensOf(name));
+  return tokens.reduce((count, token) => count + (names.has(token) ? 1 : 0), 0);
+};
+
+function inventoryVariants(index: GraphIndex, screenId: string, familyTokens: string[]) {
+  const counts = new Map<
+    string,
+    { component: GraphNode; count: number }
+  >();
+  for (const instance of index.getNestedInstances(screenId)) {
+    const main = index.getMainComponent(instance.id);
+    if (!main) continue;
+    const set = main.componentSetId ? index.getNode(main.componentSetId) : undefined;
+    const haystack = `${main.name} ${set?.name ?? ""}`.toLowerCase();
+    if (familyTokens.length && !familyTokens.some((token) => haystack.includes(token))) continue;
+    const entry = counts.get(main.id);
+    if (entry) entry.count += 1;
+    else counts.set(main.id, { component: main, count: 1 });
+  }
+  return [...counts.values()];
+}
+
+/**
+ * Unique component definitions on a frame/section, with placement counts.
+ * Instances stay in the stored graph (slot trees, blast radius). Agent answers
+ * and the atlas collapse them — 12 Heading instances become Heading × 12.
+ */
+export function screenInventory(index: GraphIndex, nodeId: string) {
+  const node = index.getNode(nodeId);
+  if (!node) return undefined;
+
+  const tally = new Map<string, { component: GraphNode; count: number }>();
+  let unresolved = 0;
+  for (const instance of index.getNestedInstances(node.id)) {
+    const main = index.getMainComponent(instance.id);
+    if (!main) {
+      unresolved += 1;
+      continue;
+    }
+    const entry = tally.get(main.id);
+    if (entry) entry.count += 1;
+    else tally.set(main.id, { component: main, count: 1 });
+  }
+
+  const components = [...tally.values()]
+    .sort((a, b) => b.count - a.count || a.component.name.localeCompare(b.component.name))
+    .map((entry) => ({
+      ...briefNode(entry.component),
+      count: entry.count,
+      identity: entry.component.metadata?.["identity"],
+    }));
+
+  return {
+    screen: briefNode(node),
+    components,
+    unresolvedInstances: unresolved,
+    hint: "Each component listed once; count is how many times it is placed. Write from this list. Do not call Figma get_design_context on this FRAME.",
+  };
+}
+
+const USAGE_CARD_BUDGET = 2000;
+
+const screenOf = (index: GraphIndex, nodeId: string): GraphNode | undefined => {
+  const path = index.getHierarchyPath(nodeId);
+  return path.find((ancestor) => isScreen(index, ancestor)) ?? path.find((ancestor) => ancestor.type === "FRAME");
+};
+
+/** Unique nested component names inside one instance (slot fills). */
+function slotNamesOf(index: GraphIndex, instanceId: string): string[] {
+  const names = new Set<string>();
+  const add = (id: string) => {
+    const main = index.getMainComponent(id);
+    if (main) names.add(main.name);
+  };
+  for (const nested of index.getNestedInstances(instanceId)) add(nested.id);
+  for (const child of index.getChildren(instanceId)) {
+    add(child.id);
+    if (child.type !== "COMPONENT_INSTANCE") {
+      for (const grand of index.getChildren(child.id)) add(grand.id);
+    }
+  }
+  return [...names].sort();
+}
+
+export function usageCardForComponent(
+  index: GraphIndex,
+  node: GraphNode,
+  options: { budgetChars?: number } = {},
+) {
+  const budgetChars = options.budgetChars ?? USAGE_CARD_BUDGET;
+  const usage = computeComponentUsage(index, node);
+  const byScreenMap = new Map<
+    string,
+    { screen: GraphNode; count: number; slots: Set<string> }
+  >();
+
+  for (const instance of index.getAllInstancesOf(node.id)) {
+    const screen = screenOf(index, instance.id);
+    if (!screen) continue;
+    let entry = byScreenMap.get(screen.id);
+    if (!entry) {
+      entry = { screen, count: 0, slots: new Set() };
+      byScreenMap.set(screen.id, entry);
+    }
+    entry.count += 1;
+    for (const slot of slotNamesOf(index, instance.id)) entry.slots.add(slot);
+  }
+
+  const pages = usage.pageIds
+    .map((id) => index.getNode(id))
+    .filter((page): page is GraphNode => Boolean(page))
+    .map((page) => ({ name: page.name, figmaNodeId: page.figmaNodeId }));
+
+  const toByScreen = (includeSlots: boolean, limit: number) =>
+    [...byScreenMap.values()]
+      .sort((a, b) => b.count - a.count || a.screen.name.localeCompare(b.screen.name))
+      .slice(0, limit)
+      .map((entry) => ({
+        name: entry.screen.name,
+        type: entry.screen.type,
+        figmaNodeId: entry.screen.figmaNodeId,
+        count: entry.count,
+        ...(includeSlots && entry.slots.size ? { slots: [...entry.slots].sort() } : {}),
+      }));
+
+  let includeSlots = true;
+  let limit = Math.max(byScreenMap.size, 1);
+  let truncated = false;
+  const base = {
+    component: {
+      ...briefNode(node),
+      variantProperties: node.variantProperties,
+      identity: node.metadata?.["identity"],
+    },
+    instances: usage.instanceCount,
+    variants: usage.variantCount,
+    riskScore: usage.riskScore,
+    pages,
+    hint: "Instance this figmaNodeId in Figma. Do not get_design_context on a parent FRAME.",
+  };
+
+  let byScreen = toByScreen(includeSlots, limit);
+  let payload = { ...base, byScreen, truncated };
+  // ponytail: drop slots then screens until under budget
+  while (JSON.stringify(payload).length > budgetChars && (includeSlots || limit > 1)) {
+    truncated = true;
+    if (includeSlots) includeSlots = false;
+    else limit = Math.max(1, Math.floor(limit / 2));
+    byScreen = toByScreen(includeSlots, limit);
+    payload = { ...base, byScreen, truncated };
+  }
+
+  return withCost(payload);
+}
+
+function pickResolveTarget(index: GraphIndex, name: string): GraphNode | undefined {
+  const hits = searchNodes(index, name, { limit: 16 });
+  if (!hits.length) return undefined;
+  const lower = name.trim().toLowerCase();
+  const ranked = [...hits].sort((a, b) => {
+    const aExact = a.node.name.toLowerCase() === lower ? 1 : 0;
+    const bExact = b.node.name.toLowerCase() === lower ? 1 : 0;
+    if (aExact !== bExact) return bExact - aExact;
+    const rank = (node: GraphNode) =>
+      node.type === "MAIN_COMPONENT" || node.type === "COMPONENT_SET"
+        ? 3
+        : node.type === "VARIANT"
+          ? 2
+          : node.type === "FRAME" || node.type === "SECTION"
+            ? 1
+            : 0;
+    return rank(b.node) - rank(a.node);
+  });
+  const node = ranked[0]!.node;
+  if (node.type === "COMPONENT_INSTANCE") return index.getMainComponent(node.id) ?? node;
+  return node;
+}
+
+/**
+ * Name in, usage card out. FRAME/SECTION names return a screen inventory.
+ * Agents call this instead of reading graph.json.
+ */
+export function componentUsageCard(
+  index: GraphIndex,
+  name: string,
+  options: { budgetChars?: number } = {},
+) {
+  const node = pickResolveTarget(index, name);
+  if (!node) {
+    return withCost({
+      found: false as const,
+      name,
+      hint: "No match. Try a component or frame name from the file.",
+    });
+  }
+  if (node.type === "FRAME" || node.type === "SECTION") {
+    const inventory = screenInventory(index, node.id);
+    return withCost({
+      found: true as const,
+      kind: "screen" as const,
+      ...inventory,
+    });
+  }
+  const card = usageCardForComponent(index, node, options);
+  const { cost, ...body } = card;
+  void cost;
+  return withCost({
+    found: true as const,
+    kind: "component" as const,
+    ...body,
+  });
+}
+
+/**
+ * "I'm building an approval summary — which button?"
+ *
+ * The new screen may not exist. Find screens that share name tokens, walk
+ * prototype neighbours (the details page next to the summary), count nested
+ * variants. Agent gets the tertiary button without dumping the file.
+ */
+export function similarUsage(index: GraphIndex, question: string) {
+  const tokens = tokensOf(question);
+  const screens = index.getNodesByType("FRAME").filter((node) => isScreen(index, node));
+  const definitions = index.getNodesByType("COMPONENT_SET", "MAIN_COMPONENT", "VARIANT");
+  const familyTokens = tokens.filter((token) =>
+    definitions.some((node) => node.name.toLowerCase().includes(token)),
+  );
+
+  const scored = screens
+    .map((screen) => ({ screen, score: overlap(screen.name, tokens) }))
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score || a.screen.name.localeCompare(b.screen.name));
+
+  const related = new Map<string, { screen: GraphNode; score: number; why: string }>();
+  for (const entry of scored.slice(0, 8)) {
+    related.set(entry.screen.id, { ...entry, why: "name" });
+    for (const neighbor of index.getNeighbors(entry.screen.id, {
+      direction: "both",
+      edgeTypes: ["PROTOTYPES_TO"],
+    })) {
+      if (!isScreen(index, neighbor) || related.has(neighbor.id)) continue;
+      related.set(neighbor.id, { screen: neighbor, score: entry.score * 0.8, why: "prototype" });
+    }
+    const parent = index.getParent(entry.screen.id);
+    if (parent) {
+      for (const sibling of index.getChildren(parent.id)) {
+        if (!isScreen(index, sibling) || related.has(sibling.id)) continue;
+        related.set(sibling.id, { screen: sibling, score: entry.score * 0.5, why: "same-section" });
+      }
+    }
+  }
+
+  const variantHits = new Map<
+    string,
+    { component: GraphNode; count: number; on: Array<{ id: string; name: string; why: string }> }
+  >();
+  for (const entry of related.values()) {
+    for (const hit of inventoryVariants(index, entry.screen.id, familyTokens)) {
+      const current = variantHits.get(hit.component.id);
+      const on = { id: entry.screen.id, name: entry.screen.name, why: entry.why };
+      const weight = (entry.why === "name" ? 4 : 1) * entry.score;
+      if (current) {
+        current.count += hit.count * weight;
+        current.on.push(on);
+      } else {
+        variantHits.set(hit.component.id, {
+          component: hit.component,
+          count: hit.count * weight,
+          on: [on],
+        });
+      }
+    }
+  }
+
+  const variants = [...variantHits.values()].sort(
+    (a, b) => b.count - a.count || a.component.name.localeCompare(b.component.name),
+  );
+
+  return {
+    tokens,
+    familyTokens,
+    screens: [...related.values()]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8)
+      .map((entry) => ({
+        id: entry.screen.id,
+        name: entry.screen.name,
+        score: entry.score,
+        why: entry.why,
+      })),
+    variants: variants.slice(0, 8).map((entry) => ({
+      id: entry.component.id,
+      name: entry.component.name,
+      variantProperties: entry.component.variantProperties,
+      status: entry.component.status,
+      set: entry.component.componentSetId
+        ? index.getNode(entry.component.componentSetId)?.name
+        : undefined,
+      count: entry.count,
+      on: entry.on,
+    })),
+  };
+}
+
+export function sharedComponents(index: GraphIndex, fromId: string, toId: string) {
+  const left = new Map(inventoryVariants(index, fromId, []).map((hit) => [hit.component.id, hit]));
+  const shared = [];
+  for (const hit of inventoryVariants(index, toId, [])) {
+    const other = left.get(hit.component.id);
+    if (!other) continue;
+    shared.push({
+      id: hit.component.id,
+      name: hit.component.name,
+      variantProperties: hit.component.variantProperties,
+      here: other.count,
+      there: hit.count,
+    });
+  }
+  return shared.sort((a, b) => b.here + b.there - (a.here + a.there));
+}
+
+export function resolveNode(index: GraphIndex, nameOrId: string): GraphNode | undefined {
+  const trimmed = nameOrId.trim();
+  if (!trimmed) return undefined;
+  return index.getNode(trimmed) ?? searchNodes(index, trimmed, { limit: 1 })[0]?.node;
+}
+
+export function suggestQuestions(index: GraphIndex, analytics: GraphAnalytics): string[] {
+  const questions: string[] = [];
+  const screens = index.getNodesByType("FRAME").filter((node) => {
+    const parent = index.getParent(node.id);
+    return parent?.type === "PAGE" || parent?.type === "SECTION" || parent?.type === "FILE";
+  });
+  const topScreen = screens[0];
+  const topComponent = analytics.componentUsage.find((usage) => usage.instanceCount > 0);
+  const hub = analytics.mostConnected.find(
+    (entry) => entry.node.type === "MAIN_COMPONENT" || entry.node.type === "COMPONENT_SET",
+  );
+
+  if (topScreen) questions.push(`What is ${topScreen.name} built from?`);
+  if (topComponent) {
+    questions.push(
+      `Where is ${topComponent.component.name} used, and what breaks if it changes?`,
+    );
+  }
+  if (hub) questions.push(`Why is ${hub.node.name} a hub in this file?`);
+  if (analytics.unusedComponents.length) {
+    questions.push("Which component definitions have zero instances?");
+  }
+  if (screens.length >= 2) {
+    questions.push(`How is ${screens[0]!.name} related to ${screens[1]!.name}?`);
+  }
+  return questions.slice(0, 5);
+}
+
+export function buildOrientBrief(index: GraphIndex): OrientBrief {
+  const analytics = computeAnalytics(index);
+  const file = index.getFileNode();
+  const communities = detectCommunitiesForIndex(index, { excludeHubs: true })
+    .communities.filter((community) => community.size > 1)
+    .slice(0, 12);
+
+  return {
+    file: {
+      name: file?.name ?? index.graph.fileName,
+      key: index.graph.fileKey,
+      sourceKind: index.graph.source.kind,
+    },
+    totals: analytics.totals,
+    godNodes: analytics.mostConnected.slice(0, 8).map((entry) => ({
+      id: entry.node.id,
+      name: entry.node.name,
+      type: entry.node.type,
+      degree: entry.degree,
+    })),
+    communities: communities.map((community) => ({
+      name: community.name,
+      size: community.size,
+      hub: community.hubId,
+    })),
+    health: {
+      unusedComponents: analytics.unusedComponents.length,
+      unresolvedInstances: analytics.unresolvedInstances.length,
+      framesWithoutComponents: analytics.framesWithoutComponents.length,
+    },
+    askNext: suggestQuestions(index, analytics),
+    hint:
+      "Implementing a screen: resolve \"<component>\" (usage card), then Figma on that figmaNodeId. Do not Read graph.json.",
+  };
+}
+
+export function toGraphReportMarkdown(brief: OrientBrief): string {
+  const lines = [
+    `# ${brief.file.name}`,
+    "",
+    `${brief.totals.nodes} nodes, ${brief.totals.edges} edges, ${brief.totals.componentDefinitions} components, ${brief.totals.instances} instances. Source: ${brief.file.sourceKind}.`,
+    "",
+    "Ingested once. Do not Read graph.json.",
+    "",
+    "## Implement a screen",
+    "",
+    "1. `resolve \"<component>\"` — usage card (screens, slot fills, figmaNodeId).",
+    "2. Figma (`use_figma` / `get_design_context`) on that `figmaNodeId` only.",
+    "3. Do **not** call `get_design_context` on a FRAME or SECTION until resolve returns an id.",
+    "",
+    "## God nodes",
+    "",
+    ...brief.godNodes.map(
+      (node) => `- **${node.name}** (\`${node.type}\`, degree ${node.degree}) \`${node.id}\``,
+    ),
+    "",
+    "## Communities",
+    "",
+    ...brief.communities.map((community) => `- **${community.name}** — ${community.size} nodes`),
+    "",
+    "## Health",
+    "",
+    `- unused components: ${brief.health.unusedComponents}`,
+    `- unresolved instances: ${brief.health.unresolvedInstances}`,
+    `- frames with no components: ${brief.health.framesWithoutComponents}`,
+    "",
+    "## Ask next",
+    "",
+    ...brief.askNext.map((question) => `- ${question}`),
+    "",
+    brief.hint,
+    "",
+  ];
+  return lines.join("\n");
+}
+
+export function queryQuestion(
+  index: GraphIndex,
+  question: string,
+  options: { maxNodes?: number; budgetChars?: number } = {},
+) {
+  const analog = similarUsage(index, question);
+  // Only the analog shortcut when the question names a component family.
+  // Empty familyTokens would treat every instance on matching screens as
+  // "pick this variant" — 12 Headings, not Heading × 12.
+  if (analog.familyTokens.length && analog.variants.length) {
+    const use = analog.variants[0]!;
+    return withCost({
+      question,
+      use,
+      also: analog.variants.slice(1),
+      similarScreens: analog.screens,
+      hint: `Use ${use.set ? `${use.set} / ` : ""}${use.name} — nested on ${use.on.map((screen) => screen.name).join(", ")}. Do not pick a variant from an unrelated screen.`,
+    });
+  }
+
+  let hits = searchNodes(index, question, { limit: 8 });
+  if (!hits.length && analog.screens[0]) {
+    const screen = index.getNode(analog.screens[0].id);
+    if (screen) {
+      hits = [{ node: screen, score: analog.screens[0].score, matchedOn: ["name"] }];
+    }
+  }
+  if (!hits.length) {
+    const orient = buildOrientBrief(index);
+    return withCost({
+      question,
+      matched: 0,
+      similarScreens: analog.screens,
+      hint: "No node matched. Use a name from Ask next, or the query language (type:main Button).",
+      askNext: orient.askNext,
+    });
+  }
+
+  const focus =
+    hits.find((hit) => hit.node.type === "FRAME" || hit.node.type === "SECTION")?.node ??
+    hits[0]!.node;
+
+  if (focus.type === "FRAME" || focus.type === "SECTION") {
+    const inventory = screenInventory(index, focus.id);
+    return withCost({
+      question,
+      focus: briefNode(focus),
+      matches: hits.map((hit) => ({ ...briefNode(hit.node), matchedOn: hit.matchedOn })),
+      ...inventory,
+    });
+  }
+  const budgetChars = options.budgetChars ?? 8000;
+  let maxNodes = options.maxNodes ?? 40;
+  let subgraph = extractSubgraph(index, {
+    focusId: focus.id,
+    level: levelForNode(focus),
+    viewMode: "dependency",
+    maxNodes,
+  });
+  let payload = {
+    question,
+    focus: briefNode(focus),
+    matches: hits.map((hit) => ({ ...briefNode(hit.node), matchedOn: hit.matchedOn })),
+    truncated: subgraph.truncated,
+    nodes: subgraph.nodes.map(briefNode),
+    edges: subgraph.edges.map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+      type: edge.type,
+    })),
+  };
+
+  // ponytail: shrink neighbourhood until under budget; add paging if agents need more
+  while (JSON.stringify(payload).length > budgetChars && maxNodes > 8) {
+    maxNodes = Math.floor(maxNodes / 2);
+    subgraph = extractSubgraph(index, {
+      focusId: focus.id,
+      level: levelForNode(focus),
+      viewMode: "dependency",
+      maxNodes,
+    });
+    payload = {
+      ...payload,
+      truncated: true,
+      nodes: subgraph.nodes.map(briefNode),
+      edges: subgraph.edges.map((edge) => ({
+        source: edge.source,
+        target: edge.target,
+        type: edge.type,
+      })),
+    };
+  }
+
+  return withCost(payload);
+}
+
+export function pathBetween(index: GraphIndex, from: string, to: string) {
+  const start = resolveNode(index, from);
+  const end = resolveNode(index, to);
+  if (!start || !end) {
+    return withCost({
+      connected: false,
+      hops: 0,
+      path: [],
+      hint: `Could not resolve ${!start ? from : to}. Call orient or query for names.`,
+    });
+  }
+  const trace = index.shortestPathTrace(start.id, end.id);
+  return withCost({
+    connected: trace.nodes.length > 0,
+    hops: trace.hops.length,
+    distance: trace.distance,
+    path: trace.nodes.map(briefNode),
+    via: trace.hops,
+    shared: sharedComponents(index, start.id, end.id).slice(0, 8),
+  });
+}
+
+export function explainNode(index: GraphIndex, nameOrId: string, task?: string) {
+  const node = resolveNode(index, nameOrId);
+  if (!node) {
+    return withCost({
+      found: false,
+      hint: `Nothing named "${nameOrId}". Call orient for god nodes, or query.`,
+    });
+  }
+  if (node.type === "FRAME" || node.type === "SECTION") {
+    const inventory = screenInventory(index, node.id);
+    return withCost({
+      found: true,
+      node: briefNode(node),
+      ...inventory,
+    });
+  }
+
+  const context = buildAiGraphContext(index, node.id, { nodeBudget: 40 });
+  if (!context) {
+    return withCost({ found: false, hint: `Could not build context for ${node.id}.` });
+  }
+  return withCost({
+    found: true,
+    node: briefNode(node),
+    truncated: context.meta.truncated,
+    markdown: toMarkdownPrompt(context, task),
+  });
+}
+
+/**
+ * Thin intelligence: which variant to put on a new screen, given sibling
+ * flows — and which ones are deprecated.
+ */
+export function checkFrame(index: GraphIndex, intent: string) {
+  const analog = similarUsage(index, intent);
+  const avoid = analog.variants.filter((variant) => index.getNode(variant.id)?.status === "deprecated");
+  const use = analog.variants.find((variant) => index.getNode(variant.id)?.status !== "deprecated");
+  return withCost({
+    intent,
+    use: use ?? null,
+    avoid,
+    similarScreens: analog.screens,
+    hint: use
+      ? `Use ${use.set ? `${use.set} / ` : ""}${use.name}. Nested on ${use.on.map((screen) => screen.name).join(", ")}.${
+          avoid.length ? ` Avoid deprecated: ${avoid.map((variant) => variant.name).join(", ")}.` : ""
+        }`
+      : analog.variants.length
+        ? "Similar screens only nest deprecated variants. Do not copy them into a new frame."
+        : "No similar screen nested this component family. query / orient for names.",
+  });
+}

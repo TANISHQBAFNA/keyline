@@ -1,0 +1,213 @@
+{
+  "arm": "A",
+  "run": 2,
+  "status": "complete",
+  "filesWritten": [
+    "eval/run-2/arm-a/LoansScreen.tsx",
+    "eval/run-2/arm-a/Header.tsx",
+    "eval/run-2/arm-a/MainCard.tsx",
+    "eval/run-2/arm-a/Heading.tsx",
+    "eval/run-2/arm-a/Amount.tsx",
+    "eval/run-2/arm-a/TotalOutstandingBalance.tsx",
+    "eval/run-2/arm-a/SpecialButton.tsx",
+    "eval/run-2/arm-a/BottomNavbar.tsx",
+    "eval/run-2/arm-a/Icon.tsx",
+    "eval/run-2/arm-a/assets.ts",
+    "eval/run-2/arm-a/TOOL_LOG.json"
+  ],
+  "componentsPresent": {
+    "Header": true,
+    "MainCard": true,
+    "Heading": true,
+    "Amount": true,
+    "TotalOutstandingBalance": true,
+    "SpecialButton": true,
+    "BottomNavbar": true
+  },
+  "calls": [
+    {
+      "tool": "UpdateCurrentStep",
+      "nodeId": null,
+      "fileKey": null,
+      "hadScreenshot": false,
+      "responseChars": 32,
+      "notes": "Timeline: Reading Figma design skill"
+    },
+    {
+      "tool": "Read",
+      "nodeId": null,
+      "fileKey": null,
+      "hadScreenshot": false,
+      "responseChars": 5124,
+      "notes": "Loaded figma-design-to-code SKILL.md before get_design_context"
+    },
+    {
+      "tool": "GetMcpTools",
+      "nodeId": null,
+      "fileKey": null,
+      "hadScreenshot": false,
+      "responseChars": 10240,
+      "notes": "schema for plugin-figma-figma get_design_context"
+    },
+    {
+      "tool": "Glob",
+      "nodeId": null,
+      "fileKey": null,
+      "hadScreenshot": false,
+      "responseChars": 180,
+      "notes": "eval/run-2/arm-a stub: TOOL_LOG.json only"
+    },
+    {
+      "tool": "UpdateCurrentStep",
+      "nodeId": null,
+      "fileKey": null,
+      "hadScreenshot": false,
+      "responseChars": 32,
+      "notes": "Timeline: Fetching Figma design context"
+    },
+    {
+      "tool": "get_design_context",
+      "nodeId": "10662:32630",
+      "fileKey": "NbivlhwDZPgPRxv7Kg4Bi8",
+      "hadScreenshot": true,
+      "responseChars": 75168,
+      "notes": "Loans list frame. skillNames=figma-design-to-code, clientLanguages=typescript, clientFrameworks=react. Screenshot + reference React/Tailwind. Slot contents present (Heading, Amount, Total Outstanding Balance). No timeout."
+    },
+    {
+      "tool": "Read",
+      "nodeId": null,
+      "fileKey": null,
+      "hadScreenshot": false,
+      "responseChars": 72,
+      "notes": "Read existing TOOL_LOG.json stub"
+    },
+    {
+      "tool": "Read",
+      "nodeId": "10662:32630",
+      "fileKey": "NbivlhwDZPgPRxv7Kg4Bi8",
+      "hadScreenshot": false,
+      "responseChars": 28000,
+      "notes": "First 400 lines of get_design_context dump (Main Card, Amount, Special Button, loan cards)"
+    },
+    {
+      "tool": "Glob",
+      "nodeId": null,
+      "fileKey": null,
+      "hadScreenshot": false,
+      "responseChars": 420,
+      "notes": "Listed existing eval TSX for local naming patterns only; did not copy Graphify"
+    },
+    {
+      "tool": "Read",
+      "nodeId": "10662:32630",
+      "fileKey": "NbivlhwDZPgPRxv7Kg4Bi8",
+      "hadScreenshot": false,
+      "responseChars": 47168,
+      "notes": "Remainder of get_design_context dump (Header, Bottom Navbar, assets)"
+    },
+    {
+      "tool": "Read",
+      "nodeId": null,
+      "fileKey": null,
+      "hadScreenshot": false,
+      "responseChars": 2400,
+      "notes": "Peeked eval/arm-a/LoansScreen.tsx for named-component split, not source of design"
+    },
+    {
+      "tool": "UpdateCurrentStep",
+      "nodeId": null,
+      "fileKey": null,
+      "hadScreenshot": false,
+      "responseChars": 32,
+      "notes": "Timeline: Writing Loans screen components"
+    },
+    {
+      "tool": "Shell",
+      "nodeId": null,
+      "fileKey": null,
+      "hadScreenshot": false,
+      "responseChars": 120,
+      "notes": "wc -c on get_design_context dump → 75168"
+    },
+    {
+      "tool": "Write",
+      "nodeId": null,
+      "fileKey": null,
+      "hadScreenshot": false,
+      "responseChars": 80,
+      "notes": "assets.ts MCP asset URLs"
+    },
+    {
+      "tool": "Write",
+      "nodeId": null,
+      "fileKey": null,
+      "hadScreenshot": false,
+      "responseChars": 80,
+      "notes": "Icon.tsx"
+    },
+    {
+      "tool": "Write",
+      "nodeId": null,
+      "fileKey": null,
+      "hadScreenshot": false,
+      "responseChars": 80,
+      "notes": "Amount.tsx"
+    },
+    {
+      "tool": "Write",
+      "nodeId": null,
+      "fileKey": null,
+      "hadScreenshot": false,
+      "responseChars": 80,
+      "notes": "Heading.tsx"
+    },
+    {
+      "tool": "Write",
+      "nodeId": null,
+      "fileKey": null,
+      "hadScreenshot": false,
+      "responseChars": 80,
+      "notes": "TotalOutstandingBalance.tsx"
+    },
+    {
+      "tool": "Write",
+      "nodeId": null,
+      "fileKey": null,
+      "hadScreenshot": false,
+      "responseChars": 80,
+      "notes": "MainCard.tsx"
+    },
+    {
+      "tool": "Write",
+      "nodeId": null,
+      "fileKey": null,
+      "hadScreenshot": false,
+      "responseChars": 80,
+      "notes": "SpecialButton.tsx"
+    },
+    {
+      "tool": "Write",
+      "nodeId": null,
+      "fileKey": null,
+      "hadScreenshot": false,
+      "responseChars": 80,
+      "notes": "Header.tsx"
+    },
+    {
+      "tool": "Write",
+      "nodeId": null,
+      "fileKey": null,
+      "hadScreenshot": false,
+      "responseChars": 80,
+      "notes": "BottomNavbar.tsx"
+    },
+    {
+      "tool": "Write",
+      "nodeId": null,
+      "fileKey": null,
+      "hadScreenshot": false,
+      "responseChars": 80,
+      "notes": "LoansScreen.tsx default export"
+    }
+  ]
+}

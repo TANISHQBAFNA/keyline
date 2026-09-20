@@ -1,0 +1,96 @@
+import { Icon } from "./Icon";
+import {
+  imgBank,
+  imgCoins,
+  imgCreditCard,
+  imgHome,
+  imgPiggyBank,
+  imgSearch,
+  imgSliders,
+} from "./assets";
+
+export function BottomNavbar() {
+  return (
+    <nav
+      className="absolute bottom-0 left-0 z-10 flex w-[440px] flex-col items-start overflow-clip rounded-[32px] border border-[#f3f4f6] shadow-[0_0_8px_1px_rgba(3,7,18,0.1)] backdrop-blur-[25px]"
+      style={{
+        backgroundImage:
+          "linear-gradient(0deg, rgb(249,250,251) 0%, rgba(249,250,251,0.9) 50%, rgba(249,250,251,0.5) 75%, rgba(249,250,251,0) 100%)",
+      }}
+    >
+      <div className="flex w-full flex-col items-start gap-3 px-4 pb-8 pt-4">
+        <div className="flex h-[52px] w-full items-center justify-center gap-3">
+          <div className="flex min-w-0 flex-1 flex-col">
+            <div className="flex items-center justify-between rounded-2xl border border-[#d1d5db] bg-white px-[13px] py-[13px]">
+              <p className="text-[16px] font-normal leading-6 text-[#6b7280] whitespace-nowrap">
+                Search Loans...
+              </p>
+              <Icon src={imgSearch} size={24} />
+            </div>
+          </div>
+          <button
+            type="button"
+            className="flex size-12 max-w-12 min-h-12 shrink-0 items-center justify-center rounded-2xl p-3 shadow-[0_2px_4px_rgba(3,7,18,0.1),0_4px_4px_rgba(3,7,18,0.1)]"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle at 14% 87%, rgb(18,52,29) 0%, rgb(33,85,47) 100%)",
+            }}
+            aria-label="Filter loans"
+          >
+            <Icon src={imgSliders} size={24} />
+          </button>
+        </div>
+
+        <div className="flex w-full items-center gap-2">
+          <a
+            href="#home"
+            className="flex shrink-0 flex-col items-center"
+            aria-label="Home"
+          >
+            <div className="flex items-start rounded-[20px] border border-[#d1d5db] bg-[rgba(231,244,235,0.9)] p-3 backdrop-blur-[25px]">
+              <Icon src={imgHome} size={24} />
+            </div>
+          </a>
+
+          <div className="flex min-w-0 flex-1 items-center justify-end rounded-2xl border border-[#d1d5db] bg-[rgba(231,244,235,0.9)] p-1 shadow-[0_0_8px_rgba(3,7,18,0.1)] backdrop-blur-[25px]">
+            <a
+              href="#accounts"
+              className="flex max-w-16 min-w-11 flex-1 flex-col items-center justify-center overflow-clip rounded-xl"
+              aria-label="Accounts"
+            >
+              <div className="flex min-w-16 items-center justify-center px-[22px] py-3">
+                <Icon src={imgBank} size={20} />
+              </div>
+            </a>
+            <a
+              href="#cards"
+              className="flex max-w-16 min-w-11 flex-1 flex-col items-center justify-center overflow-clip rounded-xl"
+              aria-label="Cards"
+            >
+              <div className="flex min-w-16 items-center justify-center px-[22px] py-3">
+                <Icon src={imgCreditCard} size={20} />
+              </div>
+            </a>
+            <a
+              href="#deposits"
+              className="flex max-w-16 min-w-11 flex-1 flex-col items-center justify-center overflow-clip rounded-xl"
+              aria-label="Deposits"
+            >
+              <div className="flex min-w-16 items-center justify-center px-[22px] py-3">
+                <Icon src={imgPiggyBank} size={20} />
+              </div>
+            </a>
+            <div className="flex h-11 min-w-[160px] flex-1 items-center justify-center overflow-clip rounded-xl border border-[#f3f4f6] bg-white shadow-[0_0_3px_#f9fafb]">
+              <div className="flex min-w-[160px] flex-1 items-center justify-center gap-2 px-4 py-3">
+                <Icon src={imgCoins} size={20} />
+                <p className="text-center text-[14px] font-semibold leading-5 text-[#21552f] whitespace-nowrap">
+                  Loans
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+}

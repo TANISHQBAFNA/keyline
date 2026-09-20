@@ -1,0 +1,47 @@
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { existsSync, mkdtempSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { graph } from "./fixture";
+import {
+  clearCache,
+  graphPath,
+  listGraphs,
+  loadGraph,
+  saveGraph,
+  storeRoot,
+} from "@/server/store";
+
+describe("store", () => {
+  const previousHome = process.env["GRAPHIFY_HOME"];
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "figma-graphify-store-"));
+    process.env["GRAPHIFY_HOME"] = dir;
+    clearCache();
+  });
+
+  afterEach(() => {
+    clearCache();
+    if (previousHome === undefined) delete process.env["GRAPHIFY_HOME"];
+    else process.env["GRAPHIFY_HOME"] = previousHome;
+  });
+
+  it("saveGraph writes only graph.json and deletes report sidecars", () => {
+    mkdirSync(join(dir, "reports"), { recursive: true });
+    mkdirSync(join(dir, "graphs"), { recursive: true });
+    writeFileSync(join(dir, "GRAPH_REPORT.md"), "# leftover\n");
+    writeFileSync(join(dir, "index.json"), "{}\n");
+    writeFileSync(join(dir, "graphs", "old.json"), "{}\n");
+    writeFileSync(join(dir, "reports", "old.md"), "# leftover\n");
+
+    const summary = saveGraph(graph);
+
+    expect(existsSync(graphPath())).toBe(true);
+    expect(readdirSync(storeRoot()).sort()).toEqual(["graph.json"]);
+    expect(loadGraph()?.graph.fileKey).toBe(graph.fileKey);
+    expect(listGraphs()).toHaveLength(1);
+    expect(summary.nodes).toBe(graph.nodes.length);
+  });
+});
