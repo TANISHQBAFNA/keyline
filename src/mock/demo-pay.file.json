@@ -1,9 +1,9 @@
 {
-  "name": "Acme Pay — Product",
+  "name": "Demo Pay — Product",
   "role": "editor",
   "lastModified": "2026-08-14T09:12:44Z",
   "editorType": "figma",
-  "thumbnailUrl": "https://s3-alpha.figma.local/thumb/acme-pay.png",
+  "thumbnailUrl": "https://s3-alpha.figma.local/thumb/demo-pay.png",
   "version": "5312400000000",
   "document": {
     "id": "0:0",
@@ -31,7 +31,7 @@
                 "id": "1:2",
                 "name": "File title",
                 "type": "TEXT",
-                "characters": "Acme Pay — Product",
+                "characters": "Demo Pay — Product",
                 "absoluteBoundingBox": {
                   "x": 80,
                   "y": 240,
@@ -292,7 +292,7 @@
                         "style": {
                           "hyperlink": {
                             "type": "URL",
-                            "url": "https://acme.example.com/legal/terms"
+                            "url": "https://demo.example.com/legal/terms"
                           }
                         }
                       }
@@ -717,7 +717,7 @@
                     "id": "20:35",
                     "name": "Summary",
                     "type": "TEXT",
-                    "characters": "Paid to Acme Store",
+                    "characters": "Paid to Demo Store",
                     "absoluteBoundingBox": {
                       "x": 940,
                       "y": 244,
@@ -1314,7 +1314,7 @@
       "description": "Grouped content container.",
       "documentationLinks": [
         {
-          "uri": "https://www.figma.com/design/AcMePaY0000DemoFileKey/Acme-Pay-Product?node-id=30-70"
+          "uri": "https://www.figma.com/design/DemoPay0000DemoFileKey/Demo-Pay-Product?node-id=30-70"
         }
       ]
     },

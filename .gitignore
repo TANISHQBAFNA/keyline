@@ -7,7 +7,17 @@ dist-server
 .env.*
 coverage
 .graphify
+.graphify/
+graphify-out
 test-results
 playwright-report
 blob-report
 playwright/.cache
+eval/
+
+# Local Figma MCP dumps. Committed demos live in src/data and src/mock.
+# Keep the Cursor MCP config at the repo root.
+*.mcp.json
+!.mcp.json
+!src/data/*.mcp.json
+!src/mock/*.mcp.json

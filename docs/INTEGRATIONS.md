@@ -162,7 +162,7 @@ compacted, and already excludes materialised inverse edges.
 
 ### Why this is the point of the product
 
-Measured on the CBX300 Portfolio screen (87 instances, 224 graph nodes):
+Measured on a captured Portfolio screen (87 instances, 224 graph nodes):
 
 | Question | Without the graph | With the graph |
 |---|---|---|

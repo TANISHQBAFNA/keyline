@@ -6,11 +6,11 @@ import {
   inferredComponentId,
   parseMetadataXml,
 } from "@/core/ingestion";
-import { cbx300PortfolioSource, cbx300ScreensSource } from "@/core/ingestion/adapters/mcpSource";
+import { demoPortfolioSource, demoScreensSource } from "@/core/ingestion/adapters/mcpSource";
 import { buildGraph } from "@/core/transform";
 import { computeAnalytics, indexGraph } from "@/core/query";
 import { buildAiGraphContext, toMarkdownPrompt } from "@/core/ai";
-import capture from "@/data/cbx300-portfolio.mcp.json";
+import capture from "@/data/demo-mobile-portfolio.mcp.json";
 
 const SAMPLE = `
 Currently selected nodes:
@@ -116,14 +116,14 @@ describe("MCP adapter", () => {
   });
 });
 
-describe("the captured CBX300 Portfolio screen", () => {
-  it("builds a traversable graph from a real file", async () => {
-    const doc = await cbx300PortfolioSource.load();
+describe("the captured demo Portfolio screen", () => {
+  it("builds a traversable graph from a captured file", async () => {
+    const doc = await demoPortfolioSource.load();
     const graph = buildGraph(doc);
     const index = indexGraph(graph);
     const analytics = computeAnalytics(index);
 
-    expect(graph.fileKey).toBe("NbivlhwDZPgPRxv7Kg4Bi8");
+    expect(graph.fileKey).toBe("DEMOFILEKEY0000000001");
     expect(analytics.totals.instances).toBe(87);
     expect(analytics.totals.componentDefinitions).toBe(20);
     expect(analytics.totals.frames).toBe(18);
@@ -132,14 +132,13 @@ describe("the captured CBX300 Portfolio screen", () => {
 
     const root = index.getNodesByType("FRAME").find((node) => node.name === "Portfolio");
     expect(root?.figmaNodeId).toBe("14430:56021");
-    // Real file key means the deep link actually opens.
     expect(root?.figmaUrl).toBe(
-      "https://www.figma.com/design/NbivlhwDZPgPRxv7Kg4Bi8/CBX300---Mobile?node-id=14430-56021",
+      "https://www.figma.com/design/DEMOFILEKEY0000000001/Demo-Mobile?node-id=14430-56021",
     );
   });
 
   it("ranks the most reused components on the screen", async () => {
-    const index = indexGraph(buildGraph(await cbx300PortfolioSource.load()));
+    const index = indexGraph(buildGraph(await demoPortfolioSource.load()));
     const analytics = computeAnalytics(index);
     expect(analytics.componentUsage.slice(0, 4).map((usage) => usage.component.name)).toEqual([
       "Heading",
@@ -151,13 +150,13 @@ describe("the captured CBX300 Portfolio screen", () => {
   });
 
   it("reports that component identity was inferred", async () => {
-    const graph = buildGraph(await cbx300PortfolioSource.load());
+    const graph = buildGraph(await demoPortfolioSource.load());
     const warning = graph.warnings.find((w) => w.code === "INFERRED_COMPONENT_IDENTITY");
     expect(warning?.detail?.["count"]).toBe(20);
   });
 
   it("answers a question in a fraction of the source payload", async () => {
-    const index = indexGraph(buildGraph(await cbx300PortfolioSource.load()));
+    const index = indexGraph(buildGraph(await demoPortfolioSource.load()));
     const mainCard = index
       .getNodesByType("MAIN_COMPONENT")
       .find((node) => node.name === "Main Card")!;
@@ -172,7 +171,7 @@ describe("the captured CBX300 Portfolio screen", () => {
   });
 
   it("answers 'where is this used' from the graph alone", async () => {
-    const index = indexGraph(buildGraph(await cbx300PortfolioSource.load()));
+    const index = indexGraph(buildGraph(await demoPortfolioSource.load()));
     const mainCard = index
       .getNodesByType("MAIN_COMPONENT")
       .find((node) => node.name === "Main Card")!;
@@ -263,9 +262,9 @@ describe("combining several MCP captures into one graph", () => {
   });
 });
 
-describe("the captured CBX300 screens", () => {
+describe("the captured demo screens", () => {
   it("merges two real frames into one graph", async () => {
-    const index = indexGraph(buildGraph(await cbx300ScreensSource.load()));
+    const index = indexGraph(buildGraph(await demoScreensSource.load()));
     const analytics = computeAnalytics(index);
 
     expect(index.getNodesByType("FRAME").filter((n) => n.parentId?.startsWith("file:"))).toHaveLength(2);
@@ -275,7 +274,7 @@ describe("the captured CBX300 screens", () => {
   });
 
   it("finds the components shared across both screens", async () => {
-    const index = indexGraph(buildGraph(await cbx300ScreensSource.load()));
+    const index = indexGraph(buildGraph(await demoScreensSource.load()));
 
     const shared = index
       .getNodesByType("MAIN_COMPONENT")

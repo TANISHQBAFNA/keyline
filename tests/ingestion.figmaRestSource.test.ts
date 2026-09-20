@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fetchFigmaRestDocument } from "@/core/ingestion/adapters/figmaRestSource";
 
-const FILE_KEY = "NbivlhwDZPgPRxv7Kg4Bi8";
+const FILE_KEY = "DEMOFILEKEY0000000001";
 
 const restFile = {
   name: "Live File",

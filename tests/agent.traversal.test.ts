@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cbx300ScreensSource } from "@/core/ingestion/adapters/mcpSource";
+import { demoScreensSource } from "@/core/ingestion/adapters/mcpSource";
 import { buildGraph } from "@/core/transform";
 import {
   computeAnalytics,
@@ -9,7 +9,7 @@ import {
   extractSubgraph,
 } from "@/core/query";
 import { buildAiGraphContext, toMarkdownPrompt } from "@/core/ai";
-import capture from "@/data/cbx300-screens.mcp.json";
+import capture from "@/data/demo-mobile-screens.mcp.json";
 
 /**
  * The agent traversal contract.
@@ -26,7 +26,7 @@ const SOURCE_BYTES = capture.captures.reduce(
 );
 
 async function load() {
-  const index = indexGraph(buildGraph(await cbx300ScreensSource.load()));
+  const index = indexGraph(buildGraph(await demoScreensSource.load()));
   return { index, analytics: computeAnalytics(index) };
 }
 

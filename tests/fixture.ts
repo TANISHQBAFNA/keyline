@@ -1,5 +1,5 @@
-import mockFile from "@/mock/acme-pay.file.json";
-import mockVariables from "@/mock/acme-pay.variables.json";
+import mockFile from "@/mock/demo-pay.file.json";
+import mockVariables from "@/mock/demo-pay.variables.json";
 import { adaptFigmaRestFile } from "@/core/ingestion";
 import { buildGraph } from "@/core/transform";
 import { computeAnalytics, indexGraph } from "@/core/query";

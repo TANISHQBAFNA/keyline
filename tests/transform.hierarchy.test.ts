@@ -8,7 +8,7 @@ describe("hierarchy conversion", () => {
   it("creates one FILE root from the DOCUMENT node", () => {
     const file = node(ids.file);
     expect(file.type).toBe("FILE");
-    expect(file.name).toBe("Acme Pay — Product");
+    expect(file.name).toBe("Demo Pay — Product");
     expect(file.figmaNodeId).toBe("0:0");
     expect(index.getNodesByType("FILE")).toHaveLength(1);
   });
@@ -81,12 +81,12 @@ describe("hierarchy conversion", () => {
     const welcome = node(ids.frameWelcome);
     expect(welcome.bounds).toEqual({ x: 0, y: 0, width: 390, height: 844 });
     expect(welcome.figmaUrl).toBe(
-      `https://www.figma.com/design/${FILE_KEY}/Acme-Pay-Product?node-id=10-10`,
+      `https://www.figma.com/design/${FILE_KEY}/Demo-Pay-Product?node-id=10-10`,
     );
   });
 
   it("builds deep links from any file name", () => {
-    expect(slugifyFileName("Acme Pay — Product")).toBe("Acme-Pay-Product");
+    expect(slugifyFileName("Demo Pay — Product")).toBe("Demo-Pay-Product");
     expect(slugifyFileName("   ")).toBe("Untitled");
     expect(figmaNodeUrl("KEY", "My File", "1:23", { devMode: true })).toBe(
       "https://www.figma.com/design/KEY/My-File?node-id=1-23&m=dev",

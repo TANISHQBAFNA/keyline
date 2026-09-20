@@ -117,7 +117,7 @@ describe("design system relationships", () => {
   it("keeps external URLs on the node instead of inventing a target node", () => {
     const legalText = node("node:10:26");
     expect(legalText.metadata?.["externalLinks"]).toEqual([
-      { url: "https://acme.example.com/legal/terms" },
+      { url: "https://demo.example.com/legal/terms" },
     ]);
   });
 });

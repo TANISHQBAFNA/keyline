@@ -19,8 +19,8 @@ test("mock graph loads without credentials", async ({ page }) => {
     void dialog.dismiss();
   });
   await ready(page);
-  await page.getByLabel("Data source").selectOption("mock:acme-pay");
-  await expect(page.getByRole("heading", { name: "Acme Pay — Product" })).toBeVisible({
+  await page.getByLabel("Data source").selectOption("mock:demo-pay");
+  await expect(page.getByRole("heading", { name: "Demo Pay — Product" })).toBeVisible({
     timeout: 20_000,
   });
   await expect(page.getByText("source: mock")).toBeVisible();
@@ -29,8 +29,8 @@ test("mock graph loads without credentials", async ({ page }) => {
 
 test("Atlas and Explorer clicks update inspector", async ({ page }) => {
   await ready(page);
-  await page.getByLabel("Data source").selectOption("mock:acme-pay");
-  await expect(page.getByRole("heading", { name: "Acme Pay — Product" })).toBeVisible();
+  await page.getByLabel("Data source").selectOption("mock:demo-pay");
+  await expect(page.getByRole("heading", { name: "Demo Pay — Product" })).toBeVisible();
 
   await expect(page.locator(".atlas__canvas")).toBeVisible();
   await expect(page.locator(".atlas__progress")).toBeHidden({ timeout: 30_000 });

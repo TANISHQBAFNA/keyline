@@ -11,9 +11,9 @@ describe("parseFigmaFileKey", () => {
   it("extracts the key from a design URL", () => {
     expect(
       parseFigmaFileKey(
-        "https://www.figma.com/design/NbivlhwDZPgPRxv7Kg4Bi8/CBX300?node-id=1-2",
+        "https://www.figma.com/design/DEMOFILEKEY0000000001/Demo-Mobile?node-id=1-2",
       ),
-    ).toBe("NbivlhwDZPgPRxv7Kg4Bi8");
+    ).toBe("DEMOFILEKEY0000000001");
   });
 
   it("accepts file, proto and board URLs", () => {
@@ -26,7 +26,7 @@ describe("parseFigmaFileKey", () => {
   });
 
   it("accepts a bare file key", () => {
-    expect(parseFigmaFileKey("NbivlhwDZPgPRxv7Kg4Bi8")).toBe("NbivlhwDZPgPRxv7Kg4Bi8");
+    expect(parseFigmaFileKey("DEMOFILEKEY0000000001")).toBe("DEMOFILEKEY0000000001");
   });
 
   it("rejects empty and junk", () => {
@@ -39,25 +39,25 @@ describe("parseFigmaTarget", () => {
   it("reads node-id from a design URL (hyphens become colons)", () => {
     expect(
       parseFigmaTarget(
-        "https://www.figma.com/design/NbivlhwDZPgPRxv7Kg4Bi8/CBX300?node-id=1-2",
+        "https://www.figma.com/design/DEMOFILEKEY0000000001/Demo-Mobile?node-id=1-2",
       ),
-    ).toEqual({ fileKey: "NbivlhwDZPgPRxv7Kg4Bi8", nodeIds: ["1:2"] });
+    ).toEqual({ fileKey: "DEMOFILEKEY0000000001", nodeIds: ["1:2"] });
   });
 
   it("accepts colon form and proto starting-point-node-id", () => {
     expect(
-      parseFigmaTarget("https://www.figma.com/design/NbivlhwDZPgPRxv7Kg4Bi8/x?node-id=1:2"),
-    ).toEqual({ fileKey: "NbivlhwDZPgPRxv7Kg4Bi8", nodeIds: ["1:2"] });
+      parseFigmaTarget("https://www.figma.com/design/DEMOFILEKEY0000000001/x?node-id=1:2"),
+    ).toEqual({ fileKey: "DEMOFILEKEY0000000001", nodeIds: ["1:2"] });
     expect(
       parseFigmaTarget(
-        "https://www.figma.com/proto/NbivlhwDZPgPRxv7Kg4Bi8/x?starting-point-node-id=3-4",
+        "https://www.figma.com/proto/DEMOFILEKEY0000000001/x?starting-point-node-id=3-4",
       ),
-    ).toEqual({ fileKey: "NbivlhwDZPgPRxv7Kg4Bi8", nodeIds: ["3:4"] });
+    ).toEqual({ fileKey: "DEMOFILEKEY0000000001", nodeIds: ["3:4"] });
   });
 
   it("leaves a bare file key unscoped", () => {
-    expect(parseFigmaTarget("NbivlhwDZPgPRxv7Kg4Bi8")).toEqual({
-      fileKey: "NbivlhwDZPgPRxv7Kg4Bi8",
+    expect(parseFigmaTarget("DEMOFILEKEY0000000001")).toEqual({
+      fileKey: "DEMOFILEKEY0000000001",
       nodeIds: [],
     });
   });
@@ -69,8 +69,8 @@ describe("parseFigmaTarget", () => {
 
 describe("isFigmaLiveTarget", () => {
   it("treats URLs and bare keys as live, local paths as not", () => {
-    expect(isFigmaLiveTarget("https://www.figma.com/design/NbivlhwDZPgPRxv7Kg4Bi8/x")).toBe(true);
-    expect(isFigmaLiveTarget("NbivlhwDZPgPRxv7Kg4Bi8")).toBe(true);
-    expect(isFigmaLiveTarget("./src/mock/acme-pay.file.json")).toBe(false);
+    expect(isFigmaLiveTarget("https://www.figma.com/design/DEMOFILEKEY0000000001/x")).toBe(true);
+    expect(isFigmaLiveTarget("DEMOFILEKEY0000000001")).toBe(true);
+    expect(isFigmaLiveTarget("./src/mock/demo-pay.file.json")).toBe(false);
   });
 });

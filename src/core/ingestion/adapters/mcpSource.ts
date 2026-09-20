@@ -1,10 +1,10 @@
-import capturedPortfolio from "@/data/cbx300-portfolio.mcp.json";
-import capturedScreens from "@/data/cbx300-screens.mcp.json";
+import capturedPortfolio from "@/data/demo-mobile-portfolio.mcp.json";
+import capturedScreens from "@/data/demo-mobile-screens.mcp.json";
 import type { IngestionSource, SourceDocument } from "../types";
 import { adaptFigmaMcpMetadata } from "./figmaMcp";
 
 /**
- * A real Figma file, captured through the Dev Mode MCP server.
+ * A Figma file, captured through the Dev Mode MCP server.
  *
  * The capture is stored verbatim (the raw `get_metadata` XML and the raw
  * `get_variable_defs` map) rather than pre-parsed, so the adapter under test is
@@ -47,14 +47,14 @@ export class CapturedMcpIngestionSource implements IngestionSource {
   }
 }
 
-export const cbx300PortfolioSource = new CapturedMcpIngestionSource(
-  "mcp:cbx300-portfolio",
-  "CBX300 — Portfolio screen (Figma MCP)",
+export const demoPortfolioSource = new CapturedMcpIngestionSource(
+  "mcp:demo-mobile-portfolio",
+  "Demo — Portfolio screen (Figma MCP)",
   capturedPortfolio,
 );
 
-export const cbx300ScreensSource = new CapturedMcpIngestionSource(
-  "mcp:cbx300-screens",
-  "CBX300 — 2 screens combined (Figma MCP)",
+export const demoScreensSource = new CapturedMcpIngestionSource(
+  "mcp:demo-mobile-screens",
+  "Demo — 2 screens combined (Figma MCP)",
   capturedScreens,
 );

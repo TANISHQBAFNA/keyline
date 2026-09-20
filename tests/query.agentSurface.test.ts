@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cbx300ScreensSource } from "@/core/ingestion/adapters/mcpSource";
+import { demoScreensSource } from "@/core/ingestion/adapters/mcpSource";
 import { buildGraph } from "@/core/transform";
 import {
   buildOrientBrief,
@@ -13,10 +13,10 @@ import {
   similarUsage,
   toGraphReportMarkdown,
 } from "@/core/query";
-import { ids, index as acme } from "./fixture";
+import { ids, index as demo } from "./fixture";
 
 async function load() {
-  return indexGraph(buildGraph(await cbx300ScreensSource.load()));
+  return indexGraph(buildGraph(await demoScreensSource.load()));
 }
 
 describe("agent surface", () => {
@@ -79,14 +79,14 @@ describe("agent surface", () => {
 
 describe("similar usage (analog screens)", () => {
   it("recommends the button variant nested on related screens, not the page tree", () => {
-    const analog = similarUsage(acme, "create account buttons");
+    const analog = similarUsage(demo, "create account buttons");
     expect(analog.screens.some((screen) => screen.id === ids.frameCreateAccount)).toBe(true);
     expect(analog.variants[0]?.id).toBe(ids.buttonPrimaryLarge);
     expect(analog.variants[0]?.variantProperties?.["Variant"]).toBe("Primary");
   });
 
   it("walks prototype neighbours so a new payment screen sees Confirm payment's danger button", () => {
-    const result = queryQuestion(acme, "receipt page buttons");
+    const result = queryQuestion(demo, "receipt page buttons");
     expect("use" in result).toBe(true);
     if (!("also" in result) || !result.also) return;
     const names = [result.use.name, ...result.also.map((variant) => variant.name)].join(" ");
@@ -95,14 +95,14 @@ describe("similar usage (analog screens)", () => {
   });
 
   it("check_frame recommends a live variant and lists deprecated ones", () => {
-    const result = checkFrame(acme, "create account buttons");
+    const result = checkFrame(demo, "create account buttons");
     expect(result.use?.id).toBe(ids.buttonPrimaryLarge);
     expect(result.use?.status).not.toBe("deprecated");
     expect(result.avoid.every((variant) => variant.status === "deprecated")).toBe(true);
   });
 
   it("path between two screens reports shared components", () => {
-    const result = pathBetween(acme, "Welcome", "Create account");
+    const result = pathBetween(demo, "Welcome", "Create account");
     expect(result.connected).toBe(true);
     if (!("via" in result) || !result.via) throw new Error("expected via hops");
     expect(result.via.some((hop) => hop.type === "PROTOTYPES_TO")).toBe(true);

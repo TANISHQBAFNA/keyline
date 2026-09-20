@@ -5,7 +5,7 @@ import {
   SourceDocumentSchema,
 } from "@/core/ingestion";
 import { buildGraph } from "@/core/transform";
-import { graph as acmeGraph, sourceDocument } from "./fixture";
+import { graph as demoGraph, sourceDocument } from "./fixture";
 
 const pluginDocument = {
   fileKey: "plugin-key",
@@ -37,10 +37,10 @@ const pluginDocument = {
 };
 
 describe("MockIngestionSource", () => {
-  it("loads Acme Pay without credentials", async () => {
+  it("loads Demo Pay without credentials", async () => {
     const doc = await new MockIngestionSource().load();
     expect(doc.source.kind).toBe("mock");
-    expect(doc.fileName).toBe("Acme Pay — Product");
+    expect(doc.fileName).toBe("Demo Pay — Product");
     expect(doc.root.children?.length).toBeGreaterThan(0);
   });
 });
@@ -106,9 +106,9 @@ describe("JsonIngestionSource", () => {
 describe("re-ingestion", () => {
   it("produces identical node and edge ids for the same source", () => {
     const again = buildGraph(sourceDocument, { builtAt: "2026-01-01T00:00:00.000Z" });
-    expect(again.nodes.map((node) => node.id)).toEqual(acmeGraph.nodes.map((node) => node.id));
+    expect(again.nodes.map((node) => node.id)).toEqual(demoGraph.nodes.map((node) => node.id));
     expect(again.edges.map((edge) => `${edge.type}:${edge.source}->${edge.target}`)).toEqual(
-      acmeGraph.edges.map((edge) => `${edge.type}:${edge.source}->${edge.target}`),
+      demoGraph.edges.map((edge) => `${edge.type}:${edge.source}->${edge.target}`),
     );
   });
 });

@@ -18,7 +18,7 @@ describe("figma REST adapter", () => {
   it("normalises the document tree without losing pages", () => {
     expect(sourceDocument.root.type).toBe("DOCUMENT");
     expect(sourceDocument.root.children).toHaveLength(4);
-    expect(sourceDocument.fileName).toBe("Acme Pay — Product");
+    expect(sourceDocument.fileName).toBe("Demo Pay — Product");
   });
 
   it("parses Figma's variant naming convention", () => {
@@ -75,7 +75,7 @@ describe("figma REST adapter", () => {
       "30:70",
     );
     expect(findNode("10:26")?.links?.[0]).toEqual({
-      url: "https://acme.example.com/legal/terms",
+      url: "https://demo.example.com/legal/terms",
     });
   });
 

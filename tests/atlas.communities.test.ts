@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { EdgeType, GraphNode, NodeType } from "@/core/model";
 import { detectCommunities, projectAtlas } from "@/core/query";
 import { createSimulation } from "@/core/layout/force";
-import { cbx300PortfolioSource } from "@/core/ingestion/adapters/mcpSource";
+import { demoPortfolioSource } from "@/core/ingestion/adapters/mcpSource";
 import { buildGraph } from "@/core/transform";
 import { indexGraph } from "@/core/query";
 import { index as mockIndex, ids } from "./fixture";
@@ -155,8 +155,8 @@ describe("atlas projection", () => {
     }
   });
 
-  it("collapses a real file down to one node per component", async () => {
-    const index = indexGraph(buildGraph(await cbx300PortfolioSource.load()));
+  it("collapses a captured file down to one node per component", async () => {
+    const index = indexGraph(buildGraph(await demoPortfolioSource.load()));
     const projection = projectAtlas(index);
     expect(projection.stats.collapsedInstances).toBe(87);
     // 87 placements, 20 components.

@@ -1,4 +1,4 @@
-# Cursor + Keyline — how-to (Tanishk)
+# Cursor + Keyline — how-to
 
 Everyday flow for using Keyline inside Cursor when building Figma screens from a brief.
 
