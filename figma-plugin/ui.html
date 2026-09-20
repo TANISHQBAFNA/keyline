@@ -1,0 +1,139 @@
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0;
+    padding: 14px;
+    font: 12px/1.5 Inter, ui-sans-serif, -apple-system, system-ui, sans-serif;
+    background: #12161f;
+    color: #e6ebf5;
+  }
+  h1 { font-size: 13px; margin: 0 0 2px; }
+  p.sub { margin: 0 0 14px; color: #8b97ad; font-size: 11px; }
+  fieldset { border: 1px solid #242c3a; border-radius: 8px; padding: 10px 12px; margin: 0 0 12px; }
+  legend { color: #8b97ad; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; padding: 0 4px; }
+  label { display: flex; align-items: center; gap: 7px; padding: 3px 0; cursor: pointer; }
+  label small { color: #64708a; }
+  .row { display: flex; gap: 8px; }
+  button {
+    flex: 1;
+    background: #1d2431;
+    border: 1px solid #33405a;
+    border-radius: 6px;
+    color: #e6ebf5;
+    padding: 8px 10px;
+    font: inherit;
+    cursor: pointer;
+  }
+  button.primary { background: #5b9dff; border-color: #5b9dff; color: #08111f; font-weight: 600; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  #status { margin-top: 12px; color: #8b97ad; font-size: 11px; min-height: 32px; }
+  #status b { color: #e6ebf5; }
+  .error { color: #ff6b6b !important; }
+  input[type="text"] {
+    width: 100%; background: #0d1017; border: 1px solid #242c3a; border-radius: 6px;
+    color: #e6ebf5; padding: 6px 8px; font: inherit; margin-top: 4px;
+  }
+</style>
+
+<h1>Figma Graphify — graph export</h1>
+<p class="sub">Emits a normalised graph document. Nothing leaves your machine unless you POST it yourself.</p>
+
+<fieldset>
+  <legend>Scope</legend>
+  <label><input type="radio" name="scope" value="page" checked /> Current page</label>
+  <label><input type="radio" name="scope" value="selection" /> Selection only</label>
+  <label><input type="radio" name="scope" value="file" /> Whole file <small>— slow on large files</small></label>
+</fieldset>
+
+<fieldset>
+  <legend>Deliver to</legend>
+  <label><input type="radio" name="target" value="download" checked /> Download JSON</label>
+  <label><input type="radio" name="target" value="post" /> POST to a local endpoint</label>
+  <input type="text" id="endpoint" value="http://localhost:5199/ingest" />
+</fieldset>
+
+<div class="row">
+  <button id="run" class="primary">Export graph</button>
+  <button id="close">Close</button>
+</div>
+
+<div id="status"></div>
+
+<script>
+  var statusEl = document.getElementById("status");
+  var runButton = document.getElementById("run");
+  var latest = null;
+
+  function pick(name) {
+    return document.querySelector('input[name="' + name + '"]:checked').value;
+  }
+
+  function say(text, isError) {
+    statusEl.textContent = text;
+    statusEl.className = isError ? "error" : "";
+  }
+
+  runButton.onclick = function () {
+    runButton.disabled = true;
+    say("Walking the document…");
+    parent.postMessage({ pluginMessage: { type: "export", scope: pick("scope") } }, "*");
+  };
+
+  document.getElementById("close").onclick = function () {
+    parent.postMessage({ pluginMessage: { type: "close" } }, "*");
+  };
+
+  onmessage = function (event) {
+    var message = event.data.pluginMessage;
+    if (!message) return;
+
+    if (message.type === "progress") {
+      say("Walking the document… " + message.visited + " nodes");
+      return;
+    }
+
+    if (message.type === "error") {
+      runButton.disabled = false;
+      say(message.message, true);
+      return;
+    }
+
+    if (message.type !== "result") return;
+    runButton.disabled = false;
+    latest = message;
+
+    var kb = (message.stats.bytes / 1024).toFixed(0);
+    var summary =
+      kb + " KB · " +
+      message.stats.components + " components · " +
+      message.stats.styles + " styles · " +
+      message.stats.variables + " variables";
+
+    if (pick("target") === "download") {
+      var blob = new Blob([message.json], { type: "application/json" });
+      var url = URL.createObjectURL(blob);
+      var link = document.createElement("a");
+      link.href = url;
+      link.download = message.fileName.replace(/[^\w-]+/g, "-").toLowerCase() + ".graph-source.json";
+      link.click();
+      URL.revokeObjectURL(url);
+      say("Downloaded. " + summary);
+      return;
+    }
+
+    var endpoint = document.getElementById("endpoint").value;
+    say("Posting to " + endpoint + "…");
+    fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: message.json,
+    })
+      .then(function (response) {
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        say("Posted. " + summary);
+      })
+      .catch(function (error) {
+        say("POST failed: " + error.message + " — falling back to download.", true);
+      });
+  };
+</script>

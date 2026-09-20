@@ -1,0 +1,13 @@
+{
+  "name": "Figma Graphify — Graph Export",
+  "id": "figma-graphify-export",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["http://localhost:*", "http://127.0.0.1:*"],
+    "reasoning": "Optionally POST the exported graph to a Graphify instance running on your own machine. Nothing is sent anywhere else."
+  }
+}

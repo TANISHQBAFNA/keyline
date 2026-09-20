@@ -1,0 +1,5 @@
+{
+  "name": "figma-graphify",
+  "description": "Figma relationship graph. Ingest a node, then resolve a component name for a usage card. Do not dump graph.json.",
+  "version": "0.1.0"
+}

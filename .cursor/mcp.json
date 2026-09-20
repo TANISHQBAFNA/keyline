@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "figma-graphify": {
+      "command": "npm",
+      "args": ["run", "mcp"]
+    }
+  }
+}
