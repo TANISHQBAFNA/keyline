@@ -6,7 +6,7 @@ Turn any Figma file into an explorable relationship graph: pages, sections, fram
 
 **Phase 1** is a working prototype with a deterministic graph foundation, mock fixtures, and a CLI agents can call without dumping the whole file into context.
 
-No Figma credentials are required to try it locally. It ships with sample fixtures so you can explore the UI and run tests offline. For live files, ingest via plugin, MCP, or REST when you are ready.
+No Figma personal access token is required for the usual agent path. It ships with sample fixtures for offline UI and tests. For live files, prefer **Figma MCP** inside Claude, Cursor, Codex, and similar tools (or the Figma plugin). REST token ingest is optional and not needed for most workflows.
 
 ## Why a graph and not another file read
 
@@ -46,22 +46,22 @@ npm run build:server
 
 ### Everyday agent flow
 
-1. Ingest a Figma **screen / frame / section** link (not a whole-file dump unless you ask for it).
-2. `npm run keyline -- resolve "Component Name"` for each master you will place.
-3. Draw in Figma using the returned `figmaNodeId` only.
-4. **Do not Read** `.graphify/graph.json` — resolve is the cheap path.
+Works through **Figma MCP** in Claude, Cursor, Codex, etc. — no `FIGMA_ACCESS_TOKEN` required.
+
+1. Connect / enable Figma MCP in your AI tool (and Figma desktop Dev Mode MCP if your setup uses it).
+2. Paste a Figma **screen / frame / section** link (not a whole-file dump unless you ask for it).
+3. Let the agent **ingest via MCP** into Keyline (or save an MCP capture and `npm run keyline -- ingest <capture.json>`).
+4. `npm run keyline -- resolve "Component Name"` for each master you will place.
+5. Draw in Figma using the returned `figmaNodeId` only.
+6. **Do not Read** `.graphify/graph.json` — resolve is the cheap path.
 
 ```bash
-export FIGMA_ACCESS_TOKEN=figd_…   # for live ingest
-npm run keyline -- ingest 'https://www.figma.com/design/<fileKey>/Name?node-id=1-2'
 npm run keyline -- resolve "Component Name"
 ```
 
-No `node-id` (whole file): each top-level FRAME/SECTION is fetched separately (slower). `--scope file` is the one-shot dump.
-
 Prefer the **`keyline`** script over any `graphify` alias when both exist.
 
-Humans: `npm run dev` → **Load Figma** (token stays in this tab).
+Humans exploring the graph UI: `npm run dev` (sample data loads with no credentials).
 
 ## Two views
 
@@ -73,12 +73,12 @@ Humans: `npm run dev` → **Load Figma** (token stays in this tab).
 
 | Source | Setup | Instance → component |
 |---|---|---|
+| **Figma MCP** (Claude / Cursor / Codex / Dev Mode) | Use the tool’s Figma MCP — **no personal access token** | Inferred from name |
 | **Figma plugin** (`figma-plugin/`) | Import the manifest; no build, no token | Exact |
-| Figma MCP (Dev Mode server) | Enable it in Figma desktop | Inferred from name |
-| Figma REST | Personal access token | Exact |
-| JSON import | Drop in any of the above | As captured |
+| JSON import | Drop an MCP or plugin capture | As captured |
+| Figma REST (optional) | Personal access token — only if you explicitly want CLI REST ingest | Exact |
 
-The plugin is the recommended path — see `figma-plugin/README.md`.
+**Recommended for agents:** Figma MCP. Plugin is fine for human export. REST token is optional, not part of the default path — see `figma-plugin/README.md` for the plugin.
 
 ## What you can do in Phase 1
 
