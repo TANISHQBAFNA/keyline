@@ -236,7 +236,7 @@ function context(args: Record<string, unknown>) {
     throw new ToolError(
       available.length
         ? `Unknown or ambiguous graphId. Available: ${available.join(", ")}. Pass one explicitly.`
-        : "No graph stored. Ingest once: `FIGMA_ACCESS_TOKEN=… npm run graphify -- ingest <figma-url>`. Then resolve, do not Read graph.json.",
+        : "No graph stored. Ingest once: `FIGMA_ACCESS_TOKEN=… npm run resolve -- ingest <figma-url>`. Then resolve, do not Read graph.json.",
     );
   }
   return resolved;

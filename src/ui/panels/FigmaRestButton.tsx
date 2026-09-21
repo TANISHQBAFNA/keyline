@@ -24,7 +24,7 @@ const writeStored = (key: string, value: string) => {
 
 /**
  * Human path for live ingest. Agents use the CLI:
- * `FIGMA_ACCESS_TOKEN=… npm run graphify -- ingest <figma-url>`
+ * `FIGMA_ACCESS_TOKEN=… npm run resolve -- ingest <figma-url>`
  *
  * Token stays in sessionStorage, never in the graph JSON.
  */

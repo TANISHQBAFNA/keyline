@@ -12,7 +12,7 @@ import { TOOLS, ToolError, callTool } from "./tools";
  * and it should start instantly and never break on an SDK upgrade.
  */
 
-const SERVER_INFO = { name: "figma-graphify", version: "0.1.0" };
+const SERVER_INFO = { name: "resolve-figma", version: "0.1.0" };
 const PROTOCOL_VERSION = "2025-06-18";
 
 interface Request {
@@ -80,7 +80,7 @@ function handle(request: Request): void {
         if (error instanceof ToolError) {
           reply(id, { content: [{ type: "text", text: message }], isError: true });
         } else {
-          process.stderr.write(`[figma-graphify] ${message}\n`);
+          process.stderr.write(`[resolve] ${message}\n`);
           reply(id, { content: [{ type: "text", text: `Internal error: ${message}` }], isError: true });
         }
       }
@@ -101,16 +101,16 @@ input.on("line", (line) => {
   try {
     request = JSON.parse(trimmed);
   } catch {
-    process.stderr.write("[figma-graphify] ignored malformed JSON-RPC line\n");
+    process.stderr.write("[resolve] ignored malformed JSON-RPC line\n");
     return;
   }
   try {
     handle(request);
   } catch (error) {
-    process.stderr.write(`[figma-graphify] ${String(error)}\n`);
+    process.stderr.write(`[resolve] ${String(error)}\n`);
   }
 });
 
 input.on("close", () => process.exit(0));
 
-process.stderr.write(`[figma-graphify] MCP server ready — ${TOOLS.length} tools\n`);
+process.stderr.write(`[resolve] MCP server ready — ${TOOLS.length} tools\n`);
