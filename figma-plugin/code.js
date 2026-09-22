@@ -1,5 +1,5 @@
 /**
- * Figma Graphify — graph export plugin.
+ * Resolve — graph export plugin.
  *
  * Runs inside Figma and emits a `SourceDocument`: the same normalised shape the
  * REST and MCP adapters produce, so it drops straight into the app with no

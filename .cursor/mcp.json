@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "figma-graphify": {
+    "resolve": {
       "command": "npm",
       "args": ["run", "mcp"]
     }

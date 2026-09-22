@@ -30,7 +30,7 @@ Parsing was already in `adaptFigmaRestFile`. Live fetch is
 ```bash
 export FIGMA_ACCESS_TOKEN=figd_…
 npm run build:server
-npm run graphify -- ingest 'https://www.figma.com/design/<fileKey>/<name>?node-id=1-2'
+npm run resolve -- ingest 'https://www.figma.com/design/<fileKey>/<name>?node-id=1-2'
 ```
 
 Paste the shared screen/frame/section URL. `node-id` is the ingest scope. No `node-id`: each top-level screen, one request at a time. `--scope file` dumps the whole tree.

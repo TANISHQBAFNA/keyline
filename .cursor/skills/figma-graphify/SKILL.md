@@ -4,14 +4,16 @@ description: >-
   Query a Figma relationship graph for component instances, variants, blast
   radius, and screen structure. Use when a Figma URL is shared, before reading
   a Figma file or calling Figma MCP get_design_context. Call resolve for a
-  usage card — never Read graph.json.
+  usage card — never Read graph.json. Product is Resolve.
 ---
 
-# Figma Graphify
+# Resolve
 
 Ingest the **shared node**. Graph stays on disk (`.graphify/graph.json`).
 **Do not Read that file.** Call `resolve` for a usage card, then Figma on that
 `figmaNodeId`.
+
+Prefer `npm run resolve` (product **Resolve**). `graphify` / `keyline` are aliases.
 
 ## When a Figma link appears
 
@@ -21,7 +23,7 @@ Ingest the **shared node**. Graph stays on disk (`.graphify/graph.json`).
 ```bash
 export FIGMA_ACCESS_TOKEN=figd_…
 npm run build:server   # first time / after pull
-npm run graphify -- ingest '<pasted-figma-url>'
+npm run resolve -- ingest '<pasted-figma-url>'
 ```
 
 3. **`resolve "<component>"`** — screens, counts, slot fills, `figmaNodeId`. Cap ~2000 chars.
@@ -49,13 +51,13 @@ Skill tools: `resolve`, `get_screen_inventory`, `check_frame`.
 No `node-id`, or user said "map the file": ingest walks **each top-level FRAME/SECTION**, one REST call at a time. Slow. Expected.
 
 ```bash
-npm run graphify -- ingest '<file-url>'              # screen-by-screen
-npm run graphify -- ingest '<file-url>' --scope file # one dump (escape hatch)
+npm run resolve -- ingest '<file-url>'              # screen-by-screen
+npm run resolve -- ingest '<file-url>' --scope file # one dump (escape hatch)
 ```
 
 ## Commands
 
 ```bash
-npm run graphify -- ingest '<figma-url>'
+npm run resolve -- ingest '<figma-url>'
 npm run mcp
 ```

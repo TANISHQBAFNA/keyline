@@ -1,4 +1,4 @@
-# Figma Graphify — graph export plugin
+# Resolve — graph export plugin
 
 Reads the open Figma file from inside Figma and writes a `SourceDocument`: the
 same normalised shape the REST and MCP adapters produce, so the output loads
@@ -8,7 +8,7 @@ into the app with no conversion step.
 
 1. Figma desktop → **Plugins → Development → Import plugin from manifest…**
 2. Pick `figma-plugin/manifest.json` from this repo.
-3. Run it from **Plugins → Development → Figma Graphify — Graph Export**.
+3. Run it from **Plugins → Development → Resolve — Graph Export**.
 
 No build step. `code.js` is plain JavaScript on purpose.
 

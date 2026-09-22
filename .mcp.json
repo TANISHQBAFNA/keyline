@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "figma-graphify": {
+    "resolve": {
       "command": "node",
       "args": ["${CLAUDE_PLUGIN_ROOT}/dist-server/mcp.mjs"]
     }

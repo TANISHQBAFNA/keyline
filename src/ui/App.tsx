@@ -39,8 +39,8 @@ export function App() {
             ◈
           </span>
           <div>
-            <h1>Figma Graphify</h1>
-            <p>{graph ? graph.fileName : "Design graph explorer"}</p>
+            <h1>Resolve</h1>
+            <p>{graph ? graph.fileName : "Figma rules. Agents resolve."}</p>
           </div>
         </div>
 
