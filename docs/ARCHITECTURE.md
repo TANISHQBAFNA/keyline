@@ -1,4 +1,4 @@
-# Figma Graphify — architecture
+# Resolve — architecture
 
 ## 1. The problem, restated
 

@@ -22,7 +22,7 @@ import {
 import { deleteGraph, graphIdFor, graphPath, listGraphs, rebuildIndex, resolveGraph, saveGraph, storeRoot } from "./store";
 
 /**
- * `graphify` CLI — ingest once into `.graphify/graph.json`.
+ * Resolve CLI — ingest once into `.graphify/graph.json`.
  *
  * Agents call resolve (usage card), then Figma. Do not Read the graph file.
  */
@@ -30,27 +30,30 @@ import { deleteGraph, graphIdFor, graphPath, listGraphs, rebuildIndex, resolveGr
 function usage(): void {
   process.stdout.write(
     [
-      "figma-graphify",
+      "Resolve — Figma rules. Agents resolve.",
       "",
-      "  graphify ingest <file.json | figma-url | file-key> [--id <graphId>] [--file-key <key>] [--name <fileName>] [--scope node|screens|file]",
+      "  resolve ingest <file.json | figma-url | file-key> [--id <graphId>] [--file-key <key>] [--name <fileName>] [--scope node|screens|file]",
       "      Build a graph and store it. JSON: plugin export, REST body, MCP capture, or a graph.",
       "      Live Figma: pass the shared screen/frame/section URL (node-id in the link).",
       "      No node-id → each top-level screen, one request at a time. --scope file = whole dump.",
       "      Token from FIGMA_ACCESS_TOKEN. Writes .graphify/graph.json — agents call resolve, do not Read that file.",
       "",
-      "  graphify resolve \"<name>\" [--id] [--budget <chars>]",
+      "  resolve resolve \"<name>\" [--id] [--budget <chars>]",
       "      Usage card: screens, slot fills, figmaNodeId. Agents: start here. Do not Read graph.json.",
-      "  graphify orient [--id <graphId>]     Optional god-node summary. Prefer resolve.",
-      "  graphify query \"<question>\" [--id] [--budget <chars>]",
+      "  resolve orient [--id <graphId>]     Optional god-node summary. Prefer resolve.",
+      "  resolve query \"<question>\" [--id] [--budget <chars>]",
       "      Optional scoped subgraph. Agents should resolve a component name instead.",
-      "  graphify path \"<A>\" \"<B>\" [--id]     Shortest relationship path",
-      "  graphify explain \"<name>\" [--id]      Bounded markdown brief for one node",
-      "  graphify check \"<intent>\" [--id]      Analog variant + deprecated to avoid",
+      "  resolve path \"<A>\" \"<B>\" [--id]     Shortest relationship path",
+      "  resolve explain \"<name>\" [--id]      Bounded markdown brief for one node",
+      "  resolve check \"<intent>\" [--id]      Analog variant + deprecated to avoid",
       "",
-      "  graphify list                 Show the stored graph",
-      "  graphify reindex              Confirm graph.json loads",
-      "  graphify rm                   Delete graph.json",
-      "  graphify where                Print the store location",
+      "  resolve list                 Show the stored graph",
+      "  resolve reindex              Confirm graph.json loads",
+      "  resolve rm                   Delete graph.json",
+      "  resolve where                Print the store location",
+      "",
+      "  npm run resolve -- <command>     primary",
+      "  npm run keyline -- <command>     deprecated alias (one release)",
       "",
     ].join("\n"),
   );
@@ -149,7 +152,7 @@ function requireGraph(args: string[]) {
   const resolved = resolveGraph(flag(args, "id"));
   if (!resolved) {
     throw new Error(
-      "No graph stored. Ingest first (`graphify ingest <figma-url>`). Then read `.graphify/graph.json`.",
+      "No graph stored. Ingest first (`resolve ingest <figma-url>`). Then read `.graphify/graph.json`.",
     );
   }
   return resolved;
@@ -199,7 +202,7 @@ async function main(argv: string[]): Promise<void> {
 
     case "resolve": {
       const name = positionals(args)[0];
-      if (!name) throw new Error('Usage: graphify resolve "<name>"');
+      if (!name) throw new Error('Usage: resolve resolve "<name>"');
       const budget = Number(flag(args, "budget"));
       printJson(
         componentUsageCard(requireGraph(args).index, name, {
@@ -218,7 +221,7 @@ async function main(argv: string[]): Promise<void> {
 
     case "query": {
       const question = positionals(args)[0];
-      if (!question) throw new Error('Usage: graphify query "<question>"');
+      if (!question) throw new Error('Usage: resolve query "<question>"');
       const budget = Number(flag(args, "budget"));
       const { index } = requireGraph(args);
       printJson(
@@ -233,21 +236,21 @@ async function main(argv: string[]): Promise<void> {
       const names = positionals(args);
       const from = names[0];
       const to = names[1];
-      if (!from || !to) throw new Error('Usage: graphify path "<A>" "<B>"');
+      if (!from || !to) throw new Error('Usage: resolve path "<A>" "<B>"');
       printJson(pathBetween(requireGraph(args).index, from, to));
       return;
     }
 
     case "explain": {
       const name = positionals(args)[0];
-      if (!name) throw new Error('Usage: graphify explain "<name>"');
+      if (!name) throw new Error('Usage: resolve explain "<name>"');
       printJson(explainNode(requireGraph(args).index, name));
       return;
     }
 
     case "check": {
       const intent = positionals(args)[0];
-      if (!intent) throw new Error('Usage: graphify check "<intent>"');
+      if (!intent) throw new Error('Usage: resolve check "<intent>"');
       printJson(checkFrame(requireGraph(args).index, intent));
       return;
     }
@@ -256,7 +259,7 @@ async function main(argv: string[]): Promise<void> {
       const graphs = listGraphs();
       if (!graphs.length) {
         process.stdout.write(
-          "No graphs stored. Run `graphify ingest <file.json>` or `graphify ingest <figma-url>`.\n",
+          "No graphs stored. Run `resolve ingest <file.json>` or `resolve ingest <figma-url>`.\n",
         );
         return;
       }

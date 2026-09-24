@@ -1,0 +1,25 @@
+---
+description: Resolve before any Figma tools or design-from-brief work. Never Read graph.json.
+alwaysApply: true
+---
+
+# Resolve — resolve before Figma
+
+Before any Figma screen build, `use_figma`, `get_design_context`, or design-from-brief work:
+
+1. Prefer **resolve** over keyline / graphify aliases.
+2. Run `npm run resolve -- resolve "<Component>"` for each master you will place.
+3. Use only the returned `figmaNodeId` with Figma tools.
+4. **Never** Read `.graphify/graph.json` or any `graph.json`.
+
+Process: brief → resolve → draw → human taste.
+
+Caps: Level-1 default; Level-2 only for blast radius; whole-file only if asked.
+
+Commands:
+
+```bash
+npm run build:server
+npm run resolve -- ingest '<url>'
+npm run resolve -- resolve "Main Card"
+```

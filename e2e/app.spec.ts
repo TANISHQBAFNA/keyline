@@ -7,7 +7,7 @@ const xssFixture = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixt
 
 async function ready(page: Page) {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Figma Graphify" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Resolve" })).toBeVisible();
   await expect(page.getByText(/source: (figma-mcp|mock)/)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("searchbox", { name: "Search the graph" })).toBeVisible();
 }

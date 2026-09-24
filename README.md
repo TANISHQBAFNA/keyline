@@ -1,19 +1,21 @@
-# Keyline
+# Resolve
 
-> [github.com/TANISHQBAFNA/keyline](https://github.com/TANISHQBAFNA/keyline)
+> Figma rules. Agents resolve.
+
+> [github.com/TANISHQBAFNA/resolve](https://github.com/TANISHQBAFNA/resolve)
 
 **You set the design rules. AI builds inside them — faster and more accurately.**
 
-The real power of Keyline: a human designer defines the UI guidelines, components, and usage scope. AI tools (Claude, Cursor, Codex, and similar) use that map to create screens without inventing a new system every time.
+The real power of Resolve: a human designer defines the UI guidelines, components, and usage scope. AI tools (Claude, Cursor, Codex, and similar) use that map to create screens without inventing a new system every time.
 
 **The loop**
 
 1. **You** set rules, guidelines, and what may be used  
-2. **Keyline** holds the map of your Figma library  
+2. **Resolve** holds the map of your Figma library  
 3. **AI** drafts screens from those masters  
 4. **You** judge taste  
 
-So Keyline is not “AI that designs.” It is **your rules, made easy for AI to follow** — without pasting the whole Figma file into chat.
+So Resolve is not “AI that designs.” It is **your rules, made easy for AI to follow** — without pasting the whole Figma file into chat.
 
 MIT licensed. Free to use.
 
@@ -43,8 +45,8 @@ You don’t need to be a developer. If you can clone a GitHub repo and paste a F
 Needs Node 22.12 or newer.
 
 ```bash
-git clone https://github.com/TANISHQBAFNA/keyline.git
-cd keyline
+git clone https://github.com/TANISHQBAFNA/resolve.git
+cd resolve
 npm install
 npm run build:server
 ```
@@ -55,9 +57,9 @@ That’s the setup. Do it once on your machine.
 
 | Tool | What to do |
 |------|------------|
-| **Cursor** | Open this folder as a project (or add it to the chat). Use the Keyline skill. |
+| **Cursor** | Open this folder as a project (or add it to the chat). Use the Resolve skill. |
 | **Claude Code** | In this folder, run: `claude --plugin-dir .` |
-| **Codex / others** | Open this folder in the tool. It can read `AGENTS.md` and `skills/keyline`. |
+| **Codex / others** | Open this folder in the tool. It can read `AGENTS.md` and `skills/resolve`. |
 
 ### 3. Connect Figma MCP
 
@@ -68,17 +70,17 @@ You do **not** need a Figma personal access token for normal use.
 ### 4. Use it day to day
 
 1. Paste a link to a **screen or frame** in Figma (not the whole file unless you really want that).  
-2. Ask the AI to pull that screen into Keyline (through Figma MCP).  
-3. Ask Keyline for each main component you’ll use, for example:
+2. Ask the AI to pull that screen into Resolve (through Figma MCP).  
+3. Ask Resolve for each main component you’ll use, for example:
 
 ```bash
-npm run keyline -- resolve "Component Name"
+npm run resolve -- resolve "Component Name"
 ```
 
 4. Let the AI design using those components.  
-5. You review for taste — Keyline is not the taste judge.
+5. You review for taste — Resolve is not the taste judge.
 
-**Tip:** Prefer the command name `keyline` if you see an older name like `graphify`.
+**Tip:** Prefer the command name `resolve` if you see an older name like `keyline` or `graphify`. `npm run keyline` still works as a deprecated alias for this release.
 
 ---
 
@@ -110,8 +112,8 @@ Most designers should use **Figma MCP** only.
 
 - Architecture notes: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)  
 - How tools plug in: [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md)  
-- Cursor-focused steps: [`docs/CURSOR-KEYLINE.md`](docs/CURSOR-KEYLINE.md)  
-- Toolchain versions (Vite 8, React 19, Vitest 5): [`CHANGELOG.md`](CHANGELOG.md)  
+- Cursor-focused steps: [`docs/CURSOR-RESOLVE.md`](docs/CURSOR-RESOLVE.md)  
+- Toolchain versions (Vite 8, React 19, Vitest 5): [`CHANGELOG.md`](CHANGELOG.md) 
 
 License: [`LICENSE`](LICENSE) (MIT)
 
@@ -120,7 +122,7 @@ License: [`LICENSE`](LICENSE) (MIT)
 ## Roadmap (short)
 
 | Now | Next ideas |
-|-----|------------|
+|-----|------|
 | Map + search + short AI cards | Clearer reports on design-system usage |
 | Works with MCP / plugin | Smoother live Figma links and previews |
 | | Optional in-app AI helpers |
