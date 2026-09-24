@@ -6,10 +6,12 @@ Tagline: **Figma rules. Agents resolve.**
 
 ## Open the repo
 
-1. Open the **Resolve** repo in Cursor (this workspace). GitHub may still show `TANISHQBAFNA/keyline` until the owner renames it.
+1. Open the **Resolve** repo in Cursor (this workspace). GitHub: [`TANISHQBAFNA/resolve`](https://github.com/TANISHQBAFNA/resolve).
 2. Work on the **box** paths under the Resolve project — do not rely on Mac-only paths for CLI runs.
 
 ## Install / build
+
+Needs Node `^22.12` or `>=24` (Vitest 5). Then:
 
 ```bash
 npm install

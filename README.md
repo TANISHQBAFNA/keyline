@@ -2,7 +2,7 @@
 
 > Figma rules. Agents resolve.
 
-> [github.com/TANISHQBAFNA/keyline](https://github.com/TANISHQBAFNA/keyline)
+> [github.com/TANISHQBAFNA/resolve](https://github.com/TANISHQBAFNA/resolve)
 
 **You set the design rules. AI builds inside them — faster and more accurately.**
 
@@ -42,16 +42,16 @@ You don’t need to be a developer. If you can clone a GitHub repo and paste a F
 
 ### 1. Get the project
 
+Needs Node 22.12 or newer.
+
 ```bash
-git clone https://github.com/TANISHQBAFNA/keyline.git
-cd keyline
+git clone https://github.com/TANISHQBAFNA/resolve.git
+cd resolve
 npm install
 npm run build:server
 ```
 
 That’s the setup. Do it once on your machine.
-
-The GitHub repository is still named `keyline` until the owner renames it on GitHub.com. Clone URL and `cd keyline` stay the same until then.
 
 ### 2. Open it in your AI tool
 
@@ -113,6 +113,7 @@ Most designers should use **Figma MCP** only.
 - Architecture notes: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)  
 - How tools plug in: [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md)  
 - Cursor-focused steps: [`docs/CURSOR-RESOLVE.md`](docs/CURSOR-RESOLVE.md)  
+- Toolchain versions (Vite 8, React 19, Vitest 5): [`CHANGELOG.md`](CHANGELOG.md) 
 
 License: [`LICENSE`](LICENSE) (MIT)
 
