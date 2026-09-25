@@ -1633,14 +1633,23 @@ pre,
 /* ------------------------------------------------------------ overview landing */
 
 .overview {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
-  gap: 16px 24px;
+  display: flex;
   align-items: center;
-  padding: 14px 16px;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--bg-raised) 80%, transparent), var(--bg-panel));
+  gap: 20px 28px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  background: var(--bg-panel);
   border-bottom: 1px solid var(--border);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.overview__identity {
+  min-width: 180px;
+}
+
+.overview__health {
+  flex: 1;
+  min-width: 160px;
 }
 
 .overview__kicker {
@@ -1676,7 +1685,16 @@ pre,
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  justify-content: flex-end;
+  margin-left: auto;
+  align-items: center;
+}
+
+.overview__hint {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  line-height: 1.45;
 }
 
 .workspace-state {
@@ -1794,11 +1812,7 @@ pre,
 }
 
 @media (max-width: 1100px) {
-  .overview {
-    grid-template-columns: 1fr;
-  }
-
   .overview__actions {
-    justify-content: flex-start;
+    margin-left: 0;
   }
 }

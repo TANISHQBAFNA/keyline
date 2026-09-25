@@ -7,6 +7,28 @@ import { libraryHealth } from "./health";
 export const AGENT_HAPPY_PATH =
   'recipe "<job>" → recommend unbound slots → Figma on those figmaNodeIds → verify_frame. Do not Read graph.json.';
 
+function copyButtonLabel(copied: boolean): string {
+  return copied ? "Copied path" : "Copy agent path";
+}
+function copyText(value: string): boolean {
+  try {
+    const field = document.createElement("textarea");
+    field.value = value;
+    field.setAttribute("readonly", "");
+    field.style.position = "fixed";
+    field.style.left = "-9999px";
+    document.body.appendChild(field);
+    field.select();
+    const ok = document.execCommand("copy");
+    field.remove();
+    if (ok) return true;
+  } catch {
+    // Fall through to clipboard API.
+  }
+  void navigator.clipboard?.writeText(value);
+  return typeof navigator.clipboard?.writeText === "function";
+}
+
 export function LibraryOverview() {
   const graph = useGraphStore((state) => state.graph);
   const analytics = useGraphStore((state) => state.analytics);
@@ -20,15 +42,13 @@ export function LibraryOverview() {
   const clusters = atlas?.communities.communities.length ?? 0;
   const modularity = atlas?.communities.modularity;
 
-  const copyHint = async () => {
-    try {
-      await navigator.clipboard.writeText(AGENT_HAPPY_PATH);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
-    } catch {
-      setCopied(false);
-    }
+  const copyHint = () => {
+    copyText(AGENT_HAPPY_PATH);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
   };
+
+  const copyLabel = copyButtonLabel(copied);
 
   return (
     <section className="overview" aria-label="Library overview">
@@ -50,9 +70,13 @@ export function LibraryOverview() {
         <button type="button" className="button--primary" onClick={() => setMode("explorer")}>
           Open Explorer
         </button>
-        <button type="button" className="button--ghost" onClick={() => void copyHint()}>
-          {copied ? "Copied path" : "Copy agent path"}
+        <button type="button" className="button--ghost" onClick={copyHint}>
+          {copyLabel}
         </button>
+        <p className="overview__hint" role="status">
+          {copied ? "Copied. " : ""}
+          {AGENT_HAPPY_PATH}
+        </p>
       </div>
     </section>
   );
