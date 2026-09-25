@@ -8,7 +8,7 @@ import { extractSubgraph, levelForNode } from "./subgraph";
 
 /**
  * Agent-facing graph surface. Graph stays on disk. Agents call resolve /
- * recommend / verify_frame / check_frame / get_screen_inventory — never Read
+ * recommend / recipe / verify_frame / check_frame / get_screen_inventory — never Read
  * graph.json. Every MCP payload carries a char cost.
  */
 
@@ -506,7 +506,7 @@ export function buildOrientBrief(index: GraphIndex): OrientBrief {
     },
     askNext: suggestQuestions(index, analytics),
     hint:
-      "Implementing a screen: recommend \"<intent>\" (ranked masters), Figma on those figmaNodeIds, then verify_frame. Do not Read graph.json.",
+      "Implementing a screen: optional recipe \"<job>\", recommend unbound slots, Figma on those figmaNodeIds, then verify_frame. Do not Read graph.json.",
   };
 }
 
@@ -520,11 +520,12 @@ export function toGraphReportMarkdown(brief: OrientBrief): string {
     "",
     "## Implement a screen",
     "",
-    "1. `recommend \"<intent>\"` — ranked masters (`figmaNodeId`, variants, where-used).",
-    "2. Figma (`use_figma` / `get_design_context`) on those `figmaNodeId`s only.",
-    "3. `verify_frame` on the new frame or placed names — invents / deprecated / unresolved.",
-    "4. `resolve \"<component>\"` when you already know the name (usage card).",
-    "5. Do **not** call `get_design_context` on a FRAME or SECTION until recommend/resolve returns an id.",
+    "1. Optional: `recipe \"<screen job>\"` — pack of masters + slots with `figmaNodeId`s.",
+    "2. `recommend \"<intent>\"` — ranked masters for unbound slots (`figmaNodeId`, variants, where-used).",
+    "3. Figma (`use_figma` / `get_design_context`) on those `figmaNodeId`s only.",
+    "4. `verify_frame` on the new frame or placed names — invents / deprecated / unresolved.",
+    "5. `resolve \"<component>\"` when you already know the name (usage card).",
+    "6. Do **not** call `get_design_context` on a FRAME or SECTION until recipe/recommend/resolve returns an id.",
     "",
     "## God nodes",
     "",
@@ -787,9 +788,6 @@ export function parseLibraryRules(raw: unknown): LibraryRules {
 
 const REFRESH_HINT =
   "Re-ingest to refresh the library before recommend/verify if Figma changed. Do not Read graph.json.";
-
-// TODO(bet-2): recipes — ordered master + slot sequences for a screen type.
-// Not shipped this PR. recommend + verify_frame are the closed loop.
 
 export interface RecommendCandidate {
   id: string;

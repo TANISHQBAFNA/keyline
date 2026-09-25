@@ -73,9 +73,10 @@ You do **not** need a Figma personal access token for normal use.
 
 1. Paste a link to a **screen or frame** in Figma (not the whole file unless you really want that).  
 2. Ask the AI to pull that screen into Resolve (through Figma MCP). Re-ingest when the library changes.  
-3. Ask Resolve what to reuse from a brief, then optionally confirm a named master:
+3. Ask Resolve for a screen pack, then ranked masters, then optionally confirm a named master:
 
 ```bash
+npm run resolve -- recipe "checkout summary"
 npm run resolve -- recommend "checkout summary with primary button"
 npm run resolve -- resolve "Component Name"
 npm run resolve -- verify "Checkout Summary"
@@ -116,6 +117,7 @@ Most designers should use **Figma MCP** only.
 
 - Architecture notes: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)  
 - How tools plug in: [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md)  
+- Screen recipes (designer JSON packs): [`docs/RECIPES.md`](docs/RECIPES.md)  
 - Cursor-focused steps: [`docs/CURSOR-RESOLVE.md`](docs/CURSOR-RESOLVE.md)  
 - Toolchain versions (Vite 8, React 19, Vitest 5): [`CHANGELOG.md`](CHANGELOG.md) 
 
@@ -128,6 +130,6 @@ License: [`LICENSE`](LICENSE) (MIT)
 | Now | Next ideas |
 |-----|------|
 | Map + search + short AI cards | Clearer reports on design-system usage |
-| `recommend` + `verify_frame` (invent rate) | Screen recipes (ordered masters + slots) |
-| Works with MCP / plugin | Smoother live Figma links and previews |
-| | Optional in-app AI helpers |
+| `recommend` + `verify_frame` (invent rate) | Smoother live Figma links and previews |
+| Screen recipes (composition packs) | Optional in-app AI helpers |
+| Works with MCP / plugin | |
