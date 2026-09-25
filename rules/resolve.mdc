@@ -9,11 +9,12 @@ Before any Figma screen build, `use_figma`, `get_design_context`, or design-from
 
 1. Prefer **resolve** over keyline / graphify aliases.
 2. Re-ingest if the Figma library changed: `npm run resolve -- ingest '<url>'`.
-3. `npm run resolve -- recommend "<intent>"` — ranked masters. Use returned `figmaNodeId`s only.
-4. After drawing: `npm run resolve -- verify "<frame>"` (or `--components a,b`).
-5. **Never** Read `.graphify/graph.json` or any `graph.json`.
+3. Optional pack: `npm run resolve -- recipe "<screen job>"`.
+4. `npm run resolve -- recommend "<intent>"` — ranked masters for unbound slots. Use returned `figmaNodeId`s only.
+5. After drawing: `npm run resolve -- verify "<frame>"` (or `--components a,b`).
+6. **Never** Read `.graphify/graph.json` or any `graph.json`.
 
-Process: ingest → recommend → draw → verify_frame → human taste.
+Process: ingest → (optional) recipe → recommend → draw → verify_frame → human taste.
 
 Caps: Level-1 default; Level-2 only for blast radius; whole-file only if asked.
 
@@ -22,6 +23,7 @@ Commands:
 ```bash
 npm run build:server
 npm run resolve -- ingest '<url>'
+npm run resolve -- recipe "checkout summary"
 npm run resolve -- recommend "checkout with primary button"
 npm run resolve -- verify "Checkout"
 ```

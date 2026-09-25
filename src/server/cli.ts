@@ -15,13 +15,15 @@ import {
   checkFrame,
   componentUsageCard,
   explainNode,
+  listRecipes,
   pathBetween,
   queryQuestion,
+  recipeCard,
   recommendMasters,
   toGraphReportMarkdown,
   verifyFrame,
 } from "@/core/query";
-import { deleteGraph, graphIdFor, graphPath, listGraphs, readLibraryRules, rebuildIndex, resolveGraph, saveGraph, storeRoot } from "./store";
+import { deleteGraph, graphIdFor, graphPath, listGraphs, loadRecipes, readLibraryRules, rebuildIndex, resolveGraph, saveGraph, storeRoot } from "./store";
 
 /**
  * Resolve CLI — ingest once into `.graphify/graph.json`.
@@ -41,6 +43,9 @@ function usage(): void {
       "      Token from FIGMA_ACCESS_TOKEN. Writes .graphify/graph.json — agents call resolve, do not Read that file.",
       "      Re-run ingest to refresh the library before recommend / verify_frame.",
       "",
+      "  resolve recipe [list | \"<name or intent>\"] [--id] [--intent \"<brief>\"]",
+      "      Screen packs. No arg / list: starter + .graphify/recipes.json overlay.",
+      "      Name or intent: slot card with figmaNodeIds. Unbound slots say what to recommend.",
       "  resolve recommend \"<intent>\" [--id] [--budget <chars>]",
       "      Ranked masters for a brief. figmaNodeId, variants, where-used. Deprecated demoted.",
       "      Agent does not need the component name. Cap ~2000 chars. Do not Read graph.json.",
@@ -207,6 +212,20 @@ async function main(argv: string[]): Promise<void> {
       throw new Error(
         `No file at ${target}. Pass a JSON path, a Figma URL, or a file key (with FIGMA_ACCESS_TOKEN).`,
       );
+    }
+
+    case "recipe":
+    case "recipes": {
+      const query = positionals(args)[0];
+      const recipes = loadRecipes();
+      if (!query || query === "list") {
+        printJson(listRecipes(recipes));
+        return;
+      }
+      printJson(
+        recipeCard(recipes, query, resolveGraph(flag(args, "id"))?.index, flag(args, "intent")),
+      );
+      return;
     }
 
     case "recommend": {

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — screen recipes
+
+Named composition packs so agents draw common screens from library masters, not invented one-offs. Designers edit JSON; agents never Read `graph.json`.
+
+- **Recipes** — ordered slots (role, required/optional, recommend hints, optional bound master id). Starter pack in `src/data/recipes.json`. Overlay: `.graphify/recipes.json` (same id replaces a starter). See `docs/RECIPES.md`.
+- **`list_recipes` / `recipe` / `get_recipe`** — MCP + CLI `npm run resolve -- recipe …`. Unbound slots use the same ranking path as `recommend`. Missing or deprecated bound ids are flagged. No invented Figma node ids.
+- **Happy path** — ingest → (optional) recipe → recommend unbound slots → Figma with returned ids → `verify_frame`.
+
 ## Unreleased — recommend + verify_frame
 
 Closed loop so reuse is measurable. Designers still set the library; agents draft from stored Figma masters.
@@ -7,9 +15,8 @@ Closed loop so reuse is measurable. Designers still set the library; agents draf
 - **`recommend`** — free-text intent → ranked masters/variants (`figmaNodeId`, where-used, slots, deprecated demoted). MCP, CLI `npm run resolve -- recommend "…"`, skill docs.
 - **`verify_frame`** — after a draw, pass/fail invents / deprecated / unresolved. Optional `.graphify/library-rules.json` allow/deny. Else in-graph master + not deprecated = approved. Deterministic, no LLM.
 - **Refresh** — re-run `resolve ingest` before recommend/verify if the Figma library changed. No live-sync rewrite.
-- Recipes (ordered screen sequences) are **not** in this release.
 
-Happy path: ingest → recommend(intent) → Figma with returned ids → verify_frame. Do not Read `graph.json`.
+Happy path: ingest → (optional) recipe → recommend(intent) → Figma with returned ids → verify_frame. Do not Read `graph.json`.
 
 ## Unreleased — toolchain upgrade (2026-09-20)
 

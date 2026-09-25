@@ -1,15 +1,25 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { DesignGraphSchema, type DesignGraph } from "@/core/model";
-import { indexGraph, parseLibraryRules, type GraphIndex, type LibraryRules } from "@/core/query";
+import {
+  indexGraph,
+  mergeRecipes,
+  parseLibraryRules,
+  parseRecipeFile,
+  starterRecipes,
+  type GraphIndex,
+  type LibraryRules,
+  type Recipe,
+} from "@/core/query";
 
 /**
  * Durable graph store. One file:
  *
  *   .graphify/graph.json
  *
- * Nodes + edges (CONTAINS, INSTANCE_OF, NESTS, …). Agents read this before
- * opening the Figma canvas. No GRAPH_REPORT, no index, no per-id copies.
+ * Optional designer files next to it: library-rules.json, recipes.json.
+ * Nodes + edges (CONTAINS, INSTANCE_OF, NESTS, …). Agents call recipe /
+ * recommend / resolve — they do not Read the graph file.
  */
 
 export interface StoredGraphSummary {
@@ -41,6 +51,25 @@ export function graphPath(): string {
 /** Optional allow/deny list next to graph.json. Missing file = graph status rules. */
 export function libraryRulesPath(): string {
   return join(storeRoot(), "library-rules.json");
+}
+
+/** Designer-editable recipe overlay next to graph.json. Missing file = starter pack only. */
+export function recipesPath(): string {
+  return join(storeRoot(), "recipes.json");
+}
+
+export function readRecipeOverlay(explicitPath?: string): Recipe[] {
+  const path = explicitPath ?? (existsSync(recipesPath()) ? recipesPath() : undefined);
+  if (!path) return [];
+  if (!existsSync(path)) {
+    throw new Error(`Recipes file not found: ${path}`);
+  }
+  const raw: unknown = JSON.parse(readFileSync(path, "utf8"));
+  return parseRecipeFile(raw);
+}
+
+export function loadRecipes(explicitPath?: string): Recipe[] {
+  return mergeRecipes(starterRecipes(), readRecipeOverlay(explicitPath));
 }
 
 export function readLibraryRules(explicitPath?: string): LibraryRules | undefined {

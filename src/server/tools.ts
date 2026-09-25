@@ -7,8 +7,10 @@ import {
   explainNode,
   extractSubgraph,
   parseLibraryRules,
+  listRecipes,
   pathBetween,
   queryQuestion,
+  recipeCard,
   recommendMasters,
   screenInventory,
   searchNodes,
@@ -21,10 +23,10 @@ import {
   type ViewMode,
 } from "@/core/query";
 import { buildAiGraphContext, toMarkdownPrompt } from "@/core/ai";
-import { listGraphs, readLibraryRules, resolveGraph } from "./store";
+import { listGraphs, loadRecipes, readLibraryRules, resolveGraph } from "./store";
 
 /**
- * Optional MCP tools. Agents: recommend / resolve / verify_frame / check_frame.
+ * Optional MCP tools. Agents: recommend / recipe / resolve / verify_frame / check_frame.
  * Do not Read graph.json. Graph stays on disk.
  */
 
@@ -45,7 +47,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "recommend",
     description:
-      "Intent in, ranked library masters out. Agent does not need the component name. Returns figmaNodeId, variant props, where-used, deprecated flagged/demoted. Cap ~2000 chars. Happy path: ingest → recommend → Figma with returned ids → verify_frame. Do not Read graph.json.",
+      "Intent in, ranked library masters out. Agent does not need the component name. Returns figmaNodeId, variant props, where-used, deprecated flagged/demoted. Cap ~2000 chars. Happy path: ingest → optional recipe → recommend unbound slots → Figma with returned ids → verify_frame. Do not Read graph.json.",
     inputSchema: {
       type: "object",
       properties: {
@@ -156,6 +158,52 @@ export const TOOLS: ToolDefinition[] = [
         allow: { type: "array", items: { type: "string" }, description: "Inline allow list (names or ids)." },
         deny: { type: "array", items: { type: "string" }, description: "Inline deny list (names or ids)." },
       },
+    },
+  },
+  {
+    name: "list_recipes",
+    description:
+      "List screen recipes (composition packs). Each recipe is a named set of library slots for a common job (checkout summary, sign-in, empty state). Does not need a graph. Next: recipe \"<id or intent>\". Do not Read graph.json.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "recipe",
+    description:
+      "Get a screen recipe by id, title, or intent. Returns ordered slots with real figmaNodeIds when the library is ingested; unbound slots include the recommend query to run next. Bound ids missing or deprecated are flagged. After placing: verify_frame. Do not Read graph.json.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...graphIdProperty,
+        query: {
+          type: "string",
+          description: 'Recipe id, title, or intent, e.g. "checkout summary" or "sign-in"',
+        },
+        intent: {
+          type: "string",
+          description: "Optional extra brief mixed into unbound-slot ranking (same path as recommend).",
+        },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "get_recipe",
+    description:
+      "Alias of recipe. Pack card for one screen job: slots, figmaNodeIds, where to recommend next.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...graphIdProperty,
+        query: {
+          type: "string",
+          description: 'Recipe id, title, or intent, e.g. "checkout summary"',
+        },
+        intent: {
+          type: "string",
+          description: "Optional extra brief mixed into unbound-slot ranking.",
+        },
+      },
+      required: ["query"],
     },
   },
   {
@@ -401,13 +449,29 @@ function dispatchTool(name: string, args: Record<string, unknown>): unknown {
       });
     }
 
+    case "list_recipes": {
+      return listRecipes(loadRecipes());
+    }
+
+    case "recipe":
+    case "get_recipe": {
+      const query = asString(
+        args["query"] ?? args["name"] ?? args["recipe"] ?? args["intent"],
+        "query",
+      );
+      const intent = typeof args["intent"] === "string" ? args["intent"].trim() : "";
+      const extra = intent && intent !== query ? intent : undefined;
+      const graphId = typeof args["graphId"] === "string" ? args["graphId"] : undefined;
+      return recipeCard(loadRecipes(), query, resolveGraph(graphId)?.index, extra);
+    }
+
     case "list_graphs": {
       const graphs = listGraphs();
       return {
         graphs,
         hint: graphs.length
-          ? "Call recommend \"<intent>\" then Figma on returned figmaNodeIds, then verify_frame. Do not Read graph.json."
-          : "Nothing stored yet. Ingest a Figma URL or JSON export first.",
+          ? "Call list_recipes or recipe \"<job>\", then recommend unbound slots, Figma on returned figmaNodeIds, then verify_frame. Do not Read graph.json."
+          : "Nothing stored yet. Ingest a Figma URL or JSON export first. list_recipes still works without a graph.",
       };
     }
 

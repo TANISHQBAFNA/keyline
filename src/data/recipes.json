@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "howToAdd": "Designers own this pack. To add or edit locally without touching agent code: copy this file to .graphify/recipes.json (it overlays the starter pack by id). Add an object to recipes[]. Reuse an id to replace a starter recipe. Leave defaultMasterId off unless that master already exists in the ingested graph — never invent a Figma node id. Unbound slots are filled by recommend from role + hints.",
+  "recipes": [
+    {
+      "id": "checkout-summary",
+      "title": "Checkout summary",
+      "intentAliases": ["checkout", "order summary", "cart", "pay now"],
+      "notes": "Totals and line items plus a primary pay action. Optional field for promo or email.",
+      "slots": [
+        { "role": "header", "required": false, "hints": ["header", "title", "nav"] },
+        { "role": "line-list", "required": true, "hints": ["payment", "row", "list"] },
+        { "role": "primary-cta", "required": true, "hints": ["button", "primary"] },
+        { "role": "input", "required": false, "hints": ["input"] }
+      ]
+    },
+    {
+      "id": "settings-form",
+      "title": "Settings form",
+      "intentAliases": ["settings", "preferences", "account form", "profile form"],
+      "notes": "Labeled fields with a save action. Bind defaultMasterId after ingest if your Input/Button ids are stable.",
+      "slots": [
+        { "role": "input", "required": true, "hints": ["input", "field"] },
+        { "role": "primary-cta", "required": true, "hints": ["button", "primary", "save"] }
+      ]
+    },
+    {
+      "id": "empty-state",
+      "title": "Empty state",
+      "intentAliases": ["empty", "zero state", "no results", "blank"],
+      "notes": "Message plus one action. Do not place deprecated banners; recommend a live master.",
+      "slots": [
+        { "role": "message", "required": false, "hints": ["empty", "message", "banner"] },
+        { "role": "primary-cta", "required": true, "hints": ["button"] }
+      ]
+    },
+    {
+      "id": "list-detail",
+      "title": "List and detail",
+      "intentAliases": ["list detail", "master detail", "split view", "inbox"],
+      "notes": "Collection row plus a detail card and an action.",
+      "slots": [
+        { "role": "list", "required": true, "hints": ["payment", "row", "list"] },
+        { "role": "detail", "required": true, "hints": ["card"] },
+        { "role": "primary-cta", "required": true, "hints": ["button"] }
+      ]
+    },
+    {
+      "id": "sign-in",
+      "title": "Sign in",
+      "intentAliases": ["sign in", "login", "log in", "auth", "authenticate"],
+      "notes": "Identifier and secret fields plus submit. Same Input master may fill both field slots.",
+      "slots": [
+        { "role": "identifier", "required": true, "hints": ["input"] },
+        { "role": "secret", "required": true, "hints": ["input"] },
+        { "role": "primary-cta", "required": true, "hints": ["button", "primary"] }
+      ]
+    },
+    {
+      "id": "confirm-dialog",
+      "title": "Confirm dialog",
+      "intentAliases": ["confirm", "dialog", "modal", "are you sure", "alert"],
+      "notes": "Short body with a primary confirm and optional secondary cancel.",
+      "slots": [
+        { "role": "body", "required": true, "hints": ["card"] },
+        { "role": "primary-cta", "required": true, "hints": ["button", "primary"] },
+        { "role": "secondary-cta", "required": false, "hints": ["button", "secondary"] }
+      ]
+    },
+    {
+      "id": "nav-content-shell",
+      "title": "Nav and content shell",
+      "intentAliases": ["shell", "app shell", "navigation", "layout", "nav content"],
+      "notes": "Page chrome around a content master. Optional page action.",
+      "slots": [
+        { "role": "header", "required": false, "hints": ["header", "nav", "title"] },
+        { "role": "content", "required": true, "hints": ["card"] },
+        { "role": "primary-cta", "required": false, "hints": ["button"] }
+      ]
+    }
+  ]
+}

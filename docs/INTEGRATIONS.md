@@ -25,7 +25,7 @@ graph model, the query layer or the UI.
 Parsing was already in `adaptFigmaRestFile`. Live fetch is
 `FigmaRestIngestionSource` / `fetchFigmaRestDocument`.
 
-**Agent path (preferred).** Ingest once into `.graphify/graph.json`. Call `recommend` for ranked masters, then Figma on those `figmaNodeId`s, then `verify_frame`. Do not Read the graph file. Re-run ingest to refresh.
+**Agent path (preferred).** Ingest once into `.graphify/graph.json`. Optional `recipe` for a screen pack, then `recommend` unbound slots, then Figma on those `figmaNodeId`s, then `verify_frame`. Do not Read the graph file. Re-run ingest to refresh.
 
 ```bash
 export FIGMA_ACCESS_TOKEN=figd_…
@@ -150,6 +150,8 @@ traverse it instead of re-reading the file. Each tool is a thin wrapper over
 
 | Tool | Implementation |
 |---|---|
+| `list_recipes()` | starter pack + `.graphify/recipes.json` overlay |
+| `recipe(query)` / `get_recipe` | `recipeCard` — slots with `figmaNodeId`s, unbound → recommend query |
 | `recommend(intent)` | `recommendMasters(index, intent)` — ranked library masters, deprecated demoted |
 | `resolve(name)` | `componentUsageCard(index, name)` — usage card when the name is known |
 | `verify_frame(frame\|components)` | `verifyFrame(index, …)` — invents / deprecated / unresolved |

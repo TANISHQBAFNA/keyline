@@ -40,15 +40,19 @@ Once per file (**re-run when the design library changes** — this is the refres
 npm run resolve -- ingest '<figma-file-or-design-url>'
 ```
 
-## Recommend → draw → verify (everyday)
+## Recipe → recommend → draw → verify (everyday)
 
 Agent does not need the component name. Cards stay the interface — **do not** `Read` `.graphify/graph.json`.
 
 ```bash
+npm run resolve -- recipe list
+npm run resolve -- recipe "checkout summary"
 npm run resolve -- recommend "checkout summary with primary button and input"
 npm run resolve -- verify "Checkout Summary"
 npm run resolve -- verify --components "Button,MadeUpCard"
 ```
+
+`recipe` returns ordered slots with `figmaNodeId`s when the library is ingested. Unbound slots include the next `recommend` query. Bound ids that are missing or deprecated are flagged.
 
 Each `recommend` card includes `figmaNodeId`, variant props, where-used, and flags deprecated masters (ranked last). Cap ~2000 chars.
 
@@ -63,13 +67,16 @@ Use the card + `figmaNodeId`. Prefer **resolve** over any keyline / graphify ali
 
 Optional allow/deny file: `.graphify/library-rules.json` with `{ "allow": [...], "deny": [...] }`. If missing, approved = in-graph master and not deprecated.
 
+Designers add screen packs in JSON — see [`docs/RECIPES.md`](RECIPES.md). Overlay: `.graphify/recipes.json`.
+
 ## Everyday screen flow
 
 1. **Ingest** — (refresh) store the library
-2. **Recommend** — brief → ranked masters
-3. **Draw** — `use_figma` / `get_design_context` on those `figmaNodeId`s only
-4. **Verify** — invents / deprecated / unresolved
-5. **Human taste** — review before expanding scope
+2. **Recipe** — (optional) named pack for the screen job
+3. **Recommend** — unbound slots / free-text brief → ranked masters
+4. **Draw** — `use_figma` / `get_design_context` on those `figmaNodeId`s only
+5. **Verify** — invents / deprecated / unresolved
+6. **Human taste** — review before expanding scope
 
 **Do not** `Read` `.graphify/graph.json`. Resolve cards are the cheap path.
 
