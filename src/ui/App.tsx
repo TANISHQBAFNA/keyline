@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { DEFAULT_SOURCE, SOURCE_OPTIONS, resolveSource } from "@/state/sources";
-import { useGraphStore } from "@/state/graphStore";
+import { useGraphStore, type LoadStatus } from "@/state/graphStore";
+import packagedRecipes from "@/data/recipes.json";
 import { Breadcrumbs } from "@/ui/common/Breadcrumbs";
 import { Toolbar } from "@/ui/common/Toolbar";
 import { GraphCanvas } from "@/ui/graph/GraphCanvas";
@@ -15,6 +16,12 @@ import { CommunityPanel } from "@/ui/panels/CommunityPanel";
 import { ExportMenu } from "@/ui/panels/ExportMenu";
 import { ImportButton } from "@/ui/panels/ImportButton";
 import { FigmaRestButton } from "@/ui/panels/FigmaRestButton";
+import { LibraryOverview } from "@/ui/overview/LibraryOverview";
+import { WorkspaceState } from "@/ui/overview/WorkspaceState";
+import { HealthChip, Stat } from "@/ui/overview/Stat";
+import { libraryHealth } from "@/ui/overview/health";
+
+const RECIPE_COUNT = Array.isArray(packagedRecipes.recipes) ? packagedRecipes.recipes.length : 0;
 
 export function App() {
   const status = useGraphStore((state) => state.status);
@@ -26,10 +33,13 @@ export function App() {
   const setMode = useGraphStore((state) => state.setMode);
   const [showWarnings, setShowWarnings] = useState(false);
   const [sourceId, setSourceId] = useState(DEFAULT_SOURCE.id);
+  const [loadFigmaOpen, setLoadFigmaOpen] = useState(false);
 
   useEffect(() => {
     void loadSource(DEFAULT_SOURCE);
   }, [loadSource]);
+
+  const health = analytics ? libraryHealth(analytics) : undefined;
 
   return (
     <div className="app">
@@ -52,7 +62,7 @@ export function App() {
             className={mode === "atlas" ? "is-active" : ""}
             onClick={() => setMode("atlas")}
           >
-            Atlas
+            Overview
           </button>
           <button
             type="button"
@@ -83,17 +93,19 @@ export function App() {
           </select>
         </label>
 
-        {graph && analytics && (
-          <div className="app__stats">
-            <span>{analytics.totals.frames} frames</span>
-            <span>{analytics.totals.componentDefinitions} components</span>
-            <span>{analytics.totals.instances} instances</span>
+        {graph && analytics && health && (
+          <div className="app__stats" aria-label="Library counts">
+            <Stat value={analytics.totals.frames} label="Frames" />
+            <Stat value={analytics.totals.componentDefinitions} label="Components" />
+            <Stat value={analytics.totals.instances} label="Instances" />
+            <Stat value={RECIPE_COUNT} label="Recipes" />
+            <HealthChip tone={health.tone} label={health.label} />
             <span className="app__source">source: {graph.source.kind}</span>
           </div>
         )}
 
         <div className="app__bar-right">
-          <FigmaRestButton />
+          <FigmaRestButton open={loadFigmaOpen} onOpenChange={setLoadFigmaOpen} />
           <ImportButton />
           <ExportMenu />
           {graph && graph.warnings.length > 0 && (
@@ -120,10 +132,26 @@ export function App() {
         </div>
       )}
 
-      {status === "loading" && <div className="app__state">Building graph…</div>}
-      {status === "error" && <div className="app__state app__state--error">{error}</div>}
+      {renderWorkspace(status, error, () => setLoadFigmaOpen(true), mode)}
+    </div>
+  );
+}
 
-      {status === "ready" && (
+function renderWorkspace(
+  status: LoadStatus,
+  error: string | undefined,
+  onIngest: () => void,
+  mode: "atlas" | "explorer",
+) {
+  switch (status) {
+    case "idle":
+      return <WorkspaceState kind="empty" onIngest={onIngest} />;
+    case "loading":
+      return <WorkspaceState kind="loading" onIngest={onIngest} />;
+    case "error":
+      return <WorkspaceState kind="error" error={error} onIngest={onIngest} />;
+    case "ready":
+      return (
         <div className="app__body">
           <aside className="app__left">
             <SearchBar />
@@ -144,9 +172,12 @@ export function App() {
                 </div>
               </>
             ) : (
-              <div className="app__canvas">
-                <AtlasCanvas />
-              </div>
+              <>
+                <LibraryOverview />
+                <div className="app__canvas">
+                  <AtlasCanvas />
+                </div>
+              </>
             )}
           </main>
 
@@ -155,7 +186,10 @@ export function App() {
             <Inspector />
           </aside>
         </div>
-      )}
-    </div>
-  );
+      );
+    default: {
+      const _exhaustive: never = status;
+      return _exhaustive;
+    }
+  }
 }
