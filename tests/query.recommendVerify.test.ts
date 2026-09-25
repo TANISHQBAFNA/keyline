@@ -1,10 +1,126 @@
 import { describe, expect, it } from "vitest";
+import type { DesignGraph, GraphEdge, GraphNode, NodeType } from "@/core/model";
 import {
+  indexGraph,
   parseLibraryRules,
   recommendMasters,
   verifyFrame,
 } from "@/core/query";
 import { ids, index as demo } from "./fixture";
+
+const FROZEN = "2026-01-01T00:00:00.000Z";
+
+function n(
+  id: string,
+  type: NodeType,
+  name: string,
+  extra: Partial<GraphNode> = {},
+): GraphNode {
+  return { id, type, name, ...extra };
+}
+
+function e(type: GraphEdge["type"], source: string, target: string): GraphEdge {
+  return { id: `${type}|${source}|${target}`, source, target, type };
+}
+
+/** Live primary CTA on Checkout Summary, unused name-trap, deprecated twin. */
+function rankingLab() {
+  const file = "file:RANK";
+  const page = "node:p";
+  const section = "node:s";
+  const frame = "node:f";
+  const btnSet = "node:btn-set";
+  const live = "node:live";
+  const dead = "node:dead";
+  const ghost = "node:ghost";
+  const row = "node:row";
+  const instBtn = "node:ib";
+  const instRow = "node:ir";
+
+  const graph: DesignGraph = {
+    fileKey: "RANK",
+    fileName: "Ranking lab",
+    builtAt: FROZEN,
+    source: { kind: "mock", ingestedAt: FROZEN },
+    warnings: [],
+    nodes: [
+      n(file, "FILE", "Ranking lab"),
+      n(page, "PAGE", "App", { parentId: file, pageId: page }),
+      n(section, "SECTION", "Flows", { parentId: page, pageId: page }),
+      n(frame, "FRAME", "Checkout Summary", {
+        parentId: section,
+        pageId: page,
+        sectionId: section,
+        figmaNodeId: "1:1",
+      }),
+      n(btnSet, "COMPONENT_SET", "Button", { parentId: page, pageId: page, figmaNodeId: "9:0" }),
+      n(live, "VARIANT", "Pay CTA", {
+        parentId: btnSet,
+        pageId: page,
+        componentSetId: btnSet,
+        figmaNodeId: "9:1",
+        variantProperties: { Variant: "Primary" },
+      }),
+      n(dead, "VARIANT", "Old Pay CTA", {
+        parentId: btnSet,
+        pageId: page,
+        componentSetId: btnSet,
+        figmaNodeId: "9:2",
+        variantProperties: { Variant: "Primary" },
+        status: "deprecated",
+      }),
+      n(ghost, "MAIN_COMPONENT", "Checkout Summary Widget", {
+        parentId: page,
+        pageId: page,
+        figmaNodeId: "7:1",
+        isMainComponent: true,
+      }),
+      n(row, "MAIN_COMPONENT", "Payment method row", {
+        parentId: page,
+        pageId: page,
+        figmaNodeId: "8:1",
+        isMainComponent: true,
+      }),
+      n(instBtn, "COMPONENT_INSTANCE", "Pay CTA", {
+        parentId: frame,
+        pageId: page,
+        sectionId: section,
+        isInstance: true,
+        mainComponentId: live,
+        componentSetId: btnSet,
+        figmaNodeId: "1:2",
+      }),
+      n(instRow, "COMPONENT_INSTANCE", "Payment method row", {
+        parentId: frame,
+        pageId: page,
+        sectionId: section,
+        isInstance: true,
+        mainComponentId: row,
+        figmaNodeId: "1:3",
+      }),
+    ],
+    edges: [
+      e("CONTAINS", file, page),
+      e("CONTAINS", page, section),
+      e("CONTAINS", section, frame),
+      e("CONTAINS", frame, instBtn),
+      e("CONTAINS", frame, instRow),
+      e("CONTAINS", page, btnSet),
+      e("CONTAINS", btnSet, live),
+      e("CONTAINS", btnSet, dead),
+      e("CONTAINS", page, ghost),
+      e("CONTAINS", page, row),
+      e("VARIANT_OF", live, btnSet),
+      e("VARIANT_OF", dead, btnSet),
+      e("INSTANCE_OF", instBtn, live),
+      e("INSTANCE_OF", instRow, row),
+      e("NESTS", frame, instBtn),
+      e("NESTS", frame, instRow),
+    ],
+  };
+
+  return { index: indexGraph(graph), ids: { live, dead, ghost, row } };
+}
 
 describe("recommend (library ranking)", () => {
   it("ranks analog masters for an intent without requiring the component name", () => {
@@ -31,6 +147,43 @@ describe("recommend (library ranking)", () => {
     if (firstDeprecated >= 0 && lastLive >= 0) {
       expect(lastLive).toBeLessThan(firstDeprecated);
     }
+  });
+
+  it("prefers a live used master over a weak name match and a deprecated twin", () => {
+    const { index, ids: lab } = rankingLab();
+    const result = recommendMasters(index, "checkout summary with primary button");
+
+    expect(result.candidates[0]?.id).toBe(lab.live);
+    expect(result.candidates[0]?.figmaNodeId).toBe("9:1");
+    expect(result.candidates[0]?.deprecated).toBe(false);
+    expect(result.candidates[0]?.variantProperties?.["Variant"]).toBe("Primary");
+    expect(result.candidates[0]?.why).toEqual(expect.arrayContaining(["variant", "where-used", "usage"]));
+
+    const ghost = result.candidates.find((candidate) => candidate.id === lab.ghost);
+    const dead = result.candidates.find((candidate) => candidate.id === lab.dead);
+    expect(result.candidates.findIndex((candidate) => candidate.id === lab.live)).toBe(0);
+    if (ghost) {
+      expect(ghost.instances).toBe(0);
+      expect(ghost.why).toContain("stale");
+    }
+    if (dead) {
+      expect(dead.deprecated).toBe(true);
+      expect(result.candidates.findIndex((candidate) => candidate.id === lab.dead)).toBeGreaterThan(0);
+    }
+    expect(result.cost.chars).toBeLessThan(2000);
+  });
+
+  it("boosts masters that co-occur with brief siblings on the same frame", () => {
+    const { index, ids: lab } = rankingLab();
+    const result = recommendMasters(index, "checkout with primary button and payment row");
+    const live = result.candidates.find((candidate) => candidate.id === lab.live);
+    const row = result.candidates.find((candidate) => candidate.id === lab.row);
+    expect(live).toBeDefined();
+    expect(row).toBeDefined();
+    expect(live?.why).toContain("co-occur");
+    expect(row?.why).toContain("co-occur");
+    expect(result.candidates[0]?.id).not.toBe(lab.ghost);
+    expect(result.candidates[0]?.id).not.toBe(lab.dead);
   });
 
   it("does not recommend invents or non-masters", () => {

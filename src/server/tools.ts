@@ -47,7 +47,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "recommend",
     description:
-      "Intent in, ranked library masters out. Agent does not need the component name. Returns figmaNodeId, variant props, where-used, deprecated flagged/demoted. Cap ~2000 chars. Happy path: ingest → optional recipe → recommend unbound slots → Figma with returned ids → verify_frame. Do not Read graph.json.",
+      "Intent in, ranked library masters out. Ranks by name/intent, variant props, where-used and sibling co-occurrence, live over stale, deprecated demoted. Returns figmaNodeId. Cap ~2000 chars. Forced path: ingest (refresh if library changed) → recipe if the screen job matches → recommend unbound slots → place only returned ids → verify_frame. Do not invent components. Do not Read graph.json.",
     inputSchema: {
       type: "object",
       properties: {
@@ -163,13 +163,16 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "list_recipes",
     description:
-      "List screen recipes (composition packs). Each recipe is a named set of library slots for a common job (checkout summary, sign-in, empty state). Does not need a graph. Next: recipe \"<id or intent>\". Do not Read graph.json.",
-    inputSchema: { type: "object", properties: {} },
+      "List screen recipes (composition packs). When a graph is ingested, slots bind to live masters (fill or suggest figmaNodeIds from recommend). Overlay .graphify/recipes.json still wins. Unbound slots include the next recommend query. Never invents node ids. Next: recipe \"<id or intent>\". Do not Read graph.json.",
+    inputSchema: {
+      type: "object",
+      properties: { ...graphIdProperty },
+    },
   },
   {
     name: "recipe",
     description:
-      "Get a screen recipe by id, title, or intent. Returns ordered slots with real figmaNodeIds when the library is ingested; unbound slots include the recommend query to run next. Bound ids missing or deprecated are flagged. After placing: verify_frame. Do not Read graph.json.",
+      "Get a screen recipe by id, title, or intent. After ingest, slots resolve against live masters (overlay .graphify/recipes.json still wins). Unbound slots include the next recommend query. Never invents node ids. After placing: verify_frame. Do not Read graph.json.",
     inputSchema: {
       type: "object",
       properties: {
@@ -189,7 +192,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "get_recipe",
     description:
-      "Alias of recipe. Pack card for one screen job: slots, figmaNodeIds, where to recommend next.",
+      "Alias of recipe. After ingest: slots bound/filled from live masters. Overlay still wins. Unbound: next recommend query. Never invents node ids.",
     inputSchema: {
       type: "object",
       properties: {
@@ -450,7 +453,8 @@ function dispatchTool(name: string, args: Record<string, unknown>): unknown {
     }
 
     case "list_recipes": {
-      return listRecipes(loadRecipes());
+      const graphId = typeof args["graphId"] === "string" ? args["graphId"] : undefined;
+      return listRecipes(loadRecipes(), resolveGraph(graphId)?.index);
     }
 
     case "recipe":

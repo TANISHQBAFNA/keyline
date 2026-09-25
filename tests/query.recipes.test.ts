@@ -96,12 +96,17 @@ describe("recipe load", () => {
 describe("recipe list + match by intent", () => {
   const recipes = parseRecipeFile(sampleFile);
 
-  it("lists id, title, aliases, and slot roles", () => {
+  it("lists id, title, aliases, and unbound nextRecommend without inventing ids", () => {
     const listed = listRecipes(recipes);
     expect(listed.recipes.map((row) => row.id)).toEqual(["checkout-summary", "sign-in"]);
     expect(listed.recipes[0]?.title).toBe("Checkout summary");
     expect(listed.recipes[0]?.slots.map((slot) => slot.role)).toContain("primary-cta");
-    expect(listed.hint).toMatch(/recipe /i);
+    expect(listed.recipes[0]?.slots.every((slot) => slot.status === "unbound")).toBe(true);
+    expect(listed.recipes[0]?.slots.every((slot) => !slot.master)).toBe(true);
+    expect(listed.recipes[0]?.slots.find((slot) => slot.role === "primary-cta")?.nextRecommend).toMatch(
+      /button/i,
+    );
+    expect(listed.hint).toMatch(/Do not invent node ids/);
   });
 
   it("matches by id, title, alias, and loose intent", () => {
@@ -217,5 +222,64 @@ describe("recipe slot fill", () => {
     expect(card.slots.every((slot) => slot.status === "unbound")).toBe(true);
     expect(card.slots.every((slot) => !slot.master)).toBe(true);
     expect(card.slots[2]?.nextRecommend).toMatch(/button/i);
+  });
+
+  it("listRecipes binds live masters after ingest and keeps overlay ids", () => {
+    const overlay = parseRecipeFile({
+      recipes: [
+        {
+          id: "checkout-summary",
+          title: "Checkout summary",
+          intentAliases: ["checkout"],
+          slots: [
+            {
+              role: "primary-cta",
+              required: true,
+              hints: ["button"],
+              defaultMasterId: ids.buttonPrimaryLarge,
+            },
+            { role: "line-list", required: true, hints: ["payment", "row"] },
+          ],
+        },
+      ],
+    });
+    const listed = listRecipes(mergeRecipes(parseRecipeFile(sampleFile), overlay), demo);
+    const checkout = listed.recipes.find((row) => row.id === "checkout-summary");
+    const cta = checkout?.slots.find((slot) => slot.role === "primary-cta");
+    const line = checkout?.slots.find((slot) => slot.role === "line-list");
+
+    expect(cta?.status).toBe("bound");
+    expect(cta?.master?.id).toBe(ids.buttonPrimaryLarge);
+    expect(cta?.master?.figmaNodeId).toBeTruthy();
+    expect(cta?.nextRecommend).toBeUndefined();
+
+    expect(line?.status).toBe("filled");
+    expect(line?.master?.id).toBe(ids.paymentRow);
+    expect(line?.master?.figmaNodeId).toBeTruthy();
+    expect(listed.hint).toMatch(/Overlay/);
+  });
+
+  it("listRecipes leaves missing overlay ids unbound with a recommend query", () => {
+    const overlay = parseRecipeFile({
+      recipes: [
+        {
+          id: "sign-in",
+          title: "Sign in",
+          slots: [
+            {
+              role: "primary-cta",
+              required: true,
+              hints: ["button"],
+              defaultMasterId: "node:does-not-exist",
+            },
+          ],
+        },
+      ],
+    });
+    const listed = listRecipes(mergeRecipes(parseRecipeFile(sampleFile), overlay), demo);
+    const signIn = listed.recipes.find((row) => row.id === "sign-in");
+    expect(signIn?.slots[0]?.status).toBe("missing");
+    expect(signIn?.slots[0]?.master).toBeUndefined();
+    expect(signIn?.slots[0]?.nextRecommend).toMatch(/button/i);
   });
 });

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — agent-output (ranking, skill path, bound recipes)
+
+AI drafting from the library gets better picks and a forced happy path — not invented one-offs.
+
+- **Recommend ranking** — name/intent, variant props, where-used and sibling co-occurrence, live over stale, deprecated demoted. Cards still cap ~2000 chars. A realistic brief prefers the live used master over a weak name match or deprecated twin.
+- **Skill path** — AGENTS.md + resolve skill: ingest (refresh if library changed) → recipe if the job matches → recommend unbound slots → place returned ids only → verify_frame. Forbidden: invent components, Read/dump graph.json.
+- **Bound recipes** — after ingest, `recipe` list/get resolve slots against live masters. Overlay `.graphify/recipes.json` still wins. Unbound slots return `nextRecommend`. Never invent node ids. See `docs/RECIPES.md`.
+
 ## Unreleased — screen recipes
 
 Named composition packs so agents draw common screens from library masters, not invented one-offs. Designers edit JSON; agents never Read `graph.json`.

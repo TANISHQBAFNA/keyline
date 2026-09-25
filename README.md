@@ -12,7 +12,7 @@ The real power of Resolve: a human designer defines the UI guidelines, component
 
 1. **You** set rules, guidelines, and what may be used  
 2. **Resolve** holds the map of your Figma library  
-3. **AI** asks Resolve what to reuse (`recommend`), then drafts from those masters  
+3. **AI** asks Resolve what to reuse (`recipe` then `recommend`), then drafts from those masters  
 4. **Resolve** checks the draft (`verify_frame`) so invent rate is visible  
 5. **You** judge taste  
 
@@ -36,7 +36,7 @@ You don’t need to be a developer. If you can clone a GitHub repo and paste a F
 2. **Faster screen drafts** — less guessing, more reuse  
 3. **Short answers** — “what is this / where is it used?” in a small card, not a giant dump  
 4. **Safer drawing** — AI gets the right Figma component id for your masters  
-5. **Measurable reuse** — `recommend` ranks library masters from a brief; `verify_frame` flags invents  
+5. **Measurable reuse** — `recommend` ranks live masters (name, variants, where-used); `verify_frame` flags invents  
 
 ---
 

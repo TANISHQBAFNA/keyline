@@ -10,9 +10,9 @@ description: >-
 # Resolve
 
 Ingest the **shared node**. Graph stays on disk (`.graphify/graph.json`).
-**Do not Read that file.** Call `recipe` for a screen pack, `recommend` (or
-`resolve` if you know the name), then Figma on that `figmaNodeId`. Then
-`verify_frame`.
+**Do not Read that file. Do not invent components.**
+
+Forced path: ingest (refresh if the library changed) → `recipe` if the screen job matches → `recommend` unbound slots → Figma on returned `figmaNodeId`s only → `verify_frame`.
 
 Prefer `npm run resolve` (product **Resolve**). `graphify` / `keyline` are aliases.
 
@@ -27,12 +27,13 @@ npm run build:server   # first time / after pull
 npm run resolve -- ingest '<pasted-figma-url>'
 ```
 
-3. **`recipe "<job>"`** — screen pack, slots + `figmaNodeId`s. Unbound: `recommend`.
-   **`recommend "<intent>"`** — ranked masters, `figmaNodeId`, where-used. Cap ~2000 chars.
+3. **`recipe "<job>"`** — screen pack. After ingest, slots bind to live `figmaNodeId`s. Unbound: `recommend`.
+   **`recommend "<intent>"`** — ranked masters (name, variants, where-used, co-occur, live over stale). Cap ~2000 chars.
    **`resolve "<component>"`** — usage card when you already know the name.
 
 Do **not**:
 
+- Invent components, names, or node ids
 - Read `.graphify/graph.json` or dump REST JSON
 - Strip `?node-id=` and fetch the whole file
 - Map every screen unless the user asked for the whole file

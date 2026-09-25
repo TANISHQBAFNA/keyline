@@ -42,9 +42,10 @@ npm run resolve -- ingest '<figma-file-or-design-url>'
 
 ## Recipe → recommend → draw → verify (everyday)
 
-Agent does not need the component name. Cards stay the interface — **do not** `Read` `.graphify/graph.json`.
+Forced path. Agent does not invent components. Cards stay the interface — **do not** `Read` `.graphify/graph.json`.
 
 ```bash
+npm run resolve -- ingest '<figma-url>'    # re-run if the library changed
 npm run resolve -- recipe list
 npm run resolve -- recipe "checkout summary"
 npm run resolve -- recommend "checkout summary with primary button and input"
@@ -52,9 +53,9 @@ npm run resolve -- verify "Checkout Summary"
 npm run resolve -- verify --components "Button,MadeUpCard"
 ```
 
-`recipe` returns ordered slots with `figmaNodeId`s when the library is ingested. Unbound slots include the next `recommend` query. Bound ids that are missing or deprecated are flagged.
+After ingest, `recipe list` / `recipe "<job>"` bind slots to live `figmaNodeId`s. Overlay `.graphify/recipes.json` still wins. Unbound slots include the next `recommend` query. Bound ids that are missing or deprecated are flagged.
 
-Each `recommend` card includes `figmaNodeId`, variant props, where-used, and flags deprecated masters (ranked last). Cap ~2000 chars.
+`recommend` ranks by name/intent, variant props, where-used, sibling co-occurrence; live over stale; deprecated last. Cap ~2000 chars.
 
 When you already know the master name:
 
