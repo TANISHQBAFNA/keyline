@@ -28,9 +28,21 @@ const writeStored = (key: string, value: string) => {
  *
  * Token stays in sessionStorage, never in the graph JSON.
  */
-export function FigmaRestButton() {
+export function FigmaRestButton({
+  open: openControlled,
+  onOpenChange,
+}: {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+} = {}) {
   const loadSource = useGraphStore((state) => state.loadSource);
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const controlled = openControlled !== undefined;
+  const open = controlled ? openControlled : internalOpen;
+  const setOpen = (next: boolean) => {
+    if (!controlled) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
   const [fileInput, setFileInput] = useState(() => readStored(FILE_KEY));
   const [token, setToken] = useState(() => readStored(TOKEN_KEY));
   const [error, setError] = useState<string | null>(null);
