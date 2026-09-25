@@ -25,7 +25,7 @@ graph model, the query layer or the UI.
 Parsing was already in `adaptFigmaRestFile`. Live fetch is
 `FigmaRestIngestionSource` / `fetchFigmaRestDocument`.
 
-**Agent path (preferred).** Ingest once into `.graphify/graph.json`. Call `resolve` for a usage card, then Figma on that `figmaNodeId`. Do not Read the graph file.
+**Agent path (preferred).** Ingest once into `.graphify/graph.json`. Call `recommend` for ranked masters, then Figma on those `figmaNodeId`s, then `verify_frame`. Do not Read the graph file. Re-run ingest to refresh.
 
 ```bash
 export FIGMA_ACCESS_TOKEN=figd_…
@@ -150,9 +150,12 @@ traverse it instead of re-reading the file. Each tool is a thin wrapper over
 
 | Tool | Implementation |
 |---|---|
+| `recommend(intent)` | `recommendMasters(index, intent)` — ranked library masters, deprecated demoted |
+| `resolve(name)` | `componentUsageCard(index, name)` — usage card when the name is known |
+| `verify_frame(frame\|components)` | `verifyFrame(index, …)` — invents / deprecated / unresolved |
+| `check_frame(intent)` | `checkFrame(index, intent)` — analog variant on similar screens |
 | `find_nodes(query)` | `searchNodes(index, query)` — the same query language as the UI |
 | `get_node(id)` | `index.getNode(id)` + `usageSummaryFor` |
-| `get_hierarchy_path(id)` | `index.getHierarchyPath(id)` |
 | `get_component_usage(id)` | `computeComponentUsage(index, node)` |
 | `get_subgraph(id, level, viewMode)` | `extractSubgraph(index, {...})` |
 | `get_ai_context(id, budget)` | `buildAiGraphContext(index, id, { nodeBudget })` |

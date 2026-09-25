@@ -10,6 +10,7 @@ Product is **Resolve**. Tagline: **Figma rules. Agents resolve.**
 Use `skills/resolve` and:
 
 ```bash
+npm run resolve -- recommend "checkout with primary button"
 npm run resolve -- resolve "Component Name"
 ```
 

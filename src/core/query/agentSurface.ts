@@ -1,5 +1,5 @@
 import { buildAiGraphContext, toMarkdownPrompt } from "@/core/ai";
-import type { GraphNode } from "@/core/model";
+import { COMPONENT_DEFINITION_TYPES, type GraphNode } from "@/core/model";
 import { computeAnalytics, computeComponentUsage, type GraphAnalytics } from "./analytics";
 import { detectCommunitiesForIndex } from "./communities";
 import type { GraphIndex } from "./GraphIndex";
@@ -8,8 +8,8 @@ import { extractSubgraph, levelForNode } from "./subgraph";
 
 /**
  * Agent-facing graph surface. Graph stays on disk. Agents call resolve /
- * check_frame / get_screen_inventory — never Read graph.json.
- * Every MCP payload carries a char cost.
+ * recommend / verify_frame / check_frame / get_screen_inventory — never Read
+ * graph.json. Every MCP payload carries a char cost.
  */
 
 export interface AgentCost {
@@ -169,6 +169,8 @@ export function screenInventory(index: GraphIndex, nodeId: string) {
 }
 
 const USAGE_CARD_BUDGET = 2000;
+const RECOMMEND_BUDGET = 2000;
+const MASTER_TYPES = COMPONENT_DEFINITION_TYPES;
 
 const screenOf = (index: GraphIndex, nodeId: string): GraphNode | undefined => {
   const path = index.getHierarchyPath(nodeId);
@@ -432,7 +434,16 @@ export function sharedComponents(index: GraphIndex, fromId: string, toId: string
 export function resolveNode(index: GraphIndex, nameOrId: string): GraphNode | undefined {
   const trimmed = nameOrId.trim();
   if (!trimmed) return undefined;
-  return index.getNode(trimmed) ?? searchNodes(index, trimmed, { limit: 1 })[0]?.node;
+  const direct = index.getNode(trimmed);
+  if (direct) return direct;
+  const colon = trimmed.replace(/-/g, ":");
+  const dash = trimmed.replace(/:/g, "-");
+  for (const node of index.allNodes) {
+    const figmaId = node.figmaNodeId;
+    if (!figmaId) continue;
+    if (figmaId === trimmed || figmaId === colon || figmaId === dash) return node;
+  }
+  return searchNodes(index, trimmed, { limit: 1 })[0]?.node;
 }
 
 export function suggestQuestions(index: GraphIndex, analytics: GraphAnalytics): string[] {
@@ -495,7 +506,7 @@ export function buildOrientBrief(index: GraphIndex): OrientBrief {
     },
     askNext: suggestQuestions(index, analytics),
     hint:
-      "Implementing a screen: resolve \"<component>\" (usage card), then Figma on that figmaNodeId. Do not Read graph.json.",
+      "Implementing a screen: recommend \"<intent>\" (ranked masters), Figma on those figmaNodeIds, then verify_frame. Do not Read graph.json.",
   };
 }
 
@@ -509,9 +520,11 @@ export function toGraphReportMarkdown(brief: OrientBrief): string {
     "",
     "## Implement a screen",
     "",
-    "1. `resolve \"<component>\"` — usage card (screens, slot fills, figmaNodeId).",
-    "2. Figma (`use_figma` / `get_design_context`) on that `figmaNodeId` only.",
-    "3. Do **not** call `get_design_context` on a FRAME or SECTION until resolve returns an id.",
+    "1. `recommend \"<intent>\"` — ranked masters (`figmaNodeId`, variants, where-used).",
+    "2. Figma (`use_figma` / `get_design_context`) on those `figmaNodeId`s only.",
+    "3. `verify_frame` on the new frame or placed names — invents / deprecated / unresolved.",
+    "4. `resolve \"<component>\"` when you already know the name (usage card).",
+    "5. Do **not** call `get_design_context` on a FRAME or SECTION until recommend/resolve returns an id.",
     "",
     "## God nodes",
     "",
@@ -705,6 +718,365 @@ export function checkFrame(index: GraphIndex, intent: string) {
         }`
       : analog.variants.length
         ? "Similar screens only nest deprecated variants. Do not copy them into a new frame."
-        : "No similar screen nested this component family. query / orient for names.",
+        : "No similar screen nested this component family. Call recommend for library-wide ranking, or query / orient for names.",
+  });
+}
+
+const isMasterType = (type: GraphNode["type"]): boolean =>
+  (MASTER_TYPES as readonly string[]).includes(type);
+
+const asMaster = (index: GraphIndex, node: GraphNode): GraphNode | undefined => {
+  if (isMasterType(node.type)) return node;
+  if (node.type === "COMPONENT_INSTANCE") return index.getMainComponent(node.id);
+  return undefined;
+};
+
+function whereUsedRows(index: GraphIndex, node: GraphNode, limit: number) {
+  const counts = new Map<string, { name: string; count: number }>();
+  for (const instance of index.getAllInstancesOf(node.id)) {
+    const screen = screenOf(index, instance.id);
+    if (!screen) continue;
+    const entry = counts.get(screen.id);
+    if (entry) entry.count += 1;
+    else counts.set(screen.id, { name: screen.name, count: 1 });
+  }
+  return [...counts.values()]
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+    .slice(0, limit);
+}
+
+function slotsForComponent(index: GraphIndex, node: GraphNode, sample = 8): string[] {
+  const names = new Set<string>();
+  for (const instance of index.getAllInstancesOf(node.id).slice(0, sample)) {
+    for (const slot of slotNamesOf(index, instance.id)) names.add(slot);
+  }
+  return [...names].sort();
+}
+
+function ruleMatches(index: GraphIndex, node: GraphNode, rule: string): boolean {
+  const needle = rule.trim().toLowerCase();
+  if (!needle) return false;
+  if (node.id.toLowerCase() === needle) return true;
+  if (node.name.toLowerCase() === needle) return true;
+  const figmaId = node.figmaNodeId?.toLowerCase();
+  if (figmaId && (figmaId === needle || figmaId.replace(/:/g, "-") === needle)) return true;
+  const set =
+    node.type === "COMPONENT_SET"
+      ? node
+      : node.componentSetId
+        ? index.getNode(node.componentSetId)
+        : undefined;
+  return Boolean(set && set.name.toLowerCase() === needle);
+}
+
+export interface LibraryRules {
+  allow?: string[];
+  deny?: string[];
+}
+
+export function parseLibraryRules(raw: unknown): LibraryRules {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const record = raw as Record<string, unknown>;
+  const list = (value: unknown): string[] | undefined => {
+    if (!Array.isArray(value)) return undefined;
+    const items = value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+    return items.length ? items.map((item) => item.trim()) : undefined;
+  };
+  return { allow: list(record["allow"]), deny: list(record["deny"]) };
+}
+
+const REFRESH_HINT =
+  "Re-ingest to refresh the library before recommend/verify if Figma changed. Do not Read graph.json.";
+
+// TODO(bet-2): recipes — ordered master + slot sequences for a screen type.
+// Not shipped this PR. recommend + verify_frame are the closed loop.
+
+export interface RecommendCandidate {
+  id: string;
+  name: string;
+  type: string;
+  figmaNodeId?: string;
+  variantProperties?: Record<string, string>;
+  set?: string;
+  status?: GraphNode["status"];
+  deprecated: boolean;
+  instances: number;
+  whereUsed: Array<{ name: string; count: number }>;
+  slots?: string[];
+  score: number;
+  why: string[];
+  hint: string;
+}
+
+/**
+ * Brief/intent → ranked library masters. Agent does not need the component
+ * name. Deprecated demoted. Never invents a component that is not in the graph.
+ */
+export function recommendMasters(
+  index: GraphIndex,
+  intent: string,
+  options: { budgetChars?: number } = {},
+) {
+  const budgetChars = options.budgetChars ?? RECOMMEND_BUDGET;
+  const analog = similarUsage(index, intent);
+  const analogById = new Map(analog.variants.map((variant) => [variant.id, variant]));
+  const tokens = analog.tokens.length ? analog.tokens : tokensOf(intent);
+
+  type Scored = {
+    node: GraphNode;
+    score: number;
+    why: string[];
+    analog: boolean;
+    deprecated: boolean;
+    instances: number;
+    setName?: string;
+  };
+
+  const scored: Scored[] = [];
+  for (const node of index.getNodesByType(...MASTER_TYPES)) {
+    const set =
+      node.type === "COMPONENT_SET"
+        ? node
+        : node.componentSetId
+          ? index.getNode(node.componentSetId)
+          : undefined;
+    const haystack = `${node.name} ${set?.name ?? ""} ${Object.values(node.variantProperties ?? {}).join(" ")}`;
+    const nameScore = overlap(haystack, tokens);
+    const analogHit = analogById.get(node.id);
+    if (nameScore === 0 && !analogHit) continue;
+
+    const deprecated = node.status === "deprecated";
+    const instances = computeComponentUsage(index, node).instanceCount;
+    const why: string[] = [];
+    if (nameScore > 0) why.push("name");
+    if (analogHit) why.push("similar-screen");
+    if (instances > 0) why.push("usage");
+
+    const typeBoost = node.type === "COMPONENT_SET" ? 3 : node.type === "MAIN_COMPONENT" ? 2 : 1;
+    const analogBoost = analogHit ? 50 + analogHit.count : 0;
+    let score = nameScore * 10 + analogBoost + Math.log1p(instances) + typeBoost;
+    if (deprecated) score -= 10_000;
+
+    scored.push({
+      node,
+      score,
+      why,
+      analog: Boolean(analogHit),
+      deprecated,
+      instances,
+      setName: set && set.id !== node.id ? set.name : undefined,
+    });
+  }
+
+  const analogIds = new Set(analogById.keys());
+  const setIds = new Set(
+    scored.filter((entry) => entry.node.type === "COMPONENT_SET").map((entry) => entry.node.id),
+  );
+  const kept = scored.filter((entry) => {
+    if (entry.node.type !== "VARIANT" || analogIds.has(entry.node.id)) return true;
+    return !entry.node.componentSetId || !setIds.has(entry.node.componentSetId);
+  });
+
+  kept.sort(
+    (a, b) =>
+      b.score - a.score ||
+      Number(a.deprecated) - Number(b.deprecated) ||
+      a.node.name.localeCompare(b.node.name),
+  );
+
+  const toCandidate = (
+    entry: Scored,
+    includeSlots: boolean,
+    whereLimit: number,
+  ): RecommendCandidate => {
+    const whereUsed = whereUsedRows(index, entry.node, whereLimit);
+    const where = whereUsed.map((row) => row.name).join(", ");
+    const slots = includeSlots ? slotsForComponent(index, entry.node) : [];
+    const hint = entry.deprecated
+      ? "Deprecated — do not place. Pick a live master from this list."
+      : entry.analog
+        ? `Place this figmaNodeId. Similar screens nest it${where ? ` (${where})` : ""}.`
+        : `Place this figmaNodeId in Figma.${where ? ` Used on ${where}.` : " No screens use it yet."}`;
+    return {
+      id: entry.node.id,
+      name: entry.node.name,
+      type: entry.node.type,
+      figmaNodeId: entry.node.figmaNodeId,
+      variantProperties: entry.node.variantProperties,
+      set: entry.setName,
+      status: entry.node.status,
+      deprecated: entry.deprecated,
+      instances: entry.instances,
+      whereUsed,
+      ...(slots.length ? { slots } : {}),
+      score: entry.score,
+      why: entry.why,
+      hint,
+    };
+  };
+
+  let includeSlots = true;
+  let whereLimit = 4;
+  let limit = Math.min(kept.length, 6);
+  let truncated = false;
+  let candidates = kept.slice(0, limit).map((entry) => toCandidate(entry, includeSlots, whereLimit));
+
+  const payloadOf = () => ({
+    intent,
+    builtAt: index.graph.builtAt,
+    candidates,
+    similarScreens: analog.screens.slice(0, 4),
+    truncated,
+    hint:
+      candidates.length === 0
+        ? `No library master matched. Do not invent a component. ${REFRESH_HINT}`
+        : `Use these figmaNodeIds with Figma MCP. Do not invent one-offs. ${REFRESH_HINT}`,
+  });
+
+  let payload = payloadOf();
+  while (JSON.stringify(payload).length > budgetChars && (includeSlots || whereLimit > 0 || limit > 1)) {
+    truncated = true;
+    if (includeSlots) includeSlots = false;
+    else if (whereLimit > 0) whereLimit = whereLimit > 2 ? 2 : whereLimit > 1 ? 1 : 0;
+    else limit = Math.max(1, Math.floor(limit / 2));
+    candidates = kept.slice(0, limit).map((entry) => toCandidate(entry, includeSlots, whereLimit));
+    payload = payloadOf();
+  }
+
+  return withCost(payload);
+}
+
+export type VerifyReason = "not-in-graph" | "not-a-master" | "denied";
+export type UnresolvedReason = "unresolved-instance" | "frame-not-in-graph";
+
+export interface VerifyHit {
+  name: string;
+  id?: string;
+  figmaNodeId?: string;
+  reason?: VerifyReason | UnresolvedReason;
+  status?: GraphNode["status"];
+}
+
+/**
+ * Thin post-draw check. Pass iff every placed component is an approved
+ * (in-graph, not deprecated) master. Deterministic — no LLM.
+ */
+export function verifyFrame(
+  index: GraphIndex,
+  input: { frame?: string; components?: string[]; rules?: LibraryRules } = {},
+) {
+  const invents: VerifyHit[] = [];
+  const deprecatedHits: VerifyHit[] = [];
+  const unresolved: VerifyHit[] = [];
+  const approvedIds = new Set<string>();
+  const seenInvent = new Set<string>();
+  const seenDeprecated = new Set<string>();
+  const seenUnresolved = new Set<string>();
+
+  const allow = input.rules?.allow?.filter((item) => item.trim().length > 0);
+  const deny = input.rules?.deny?.filter((item) => item.trim().length > 0);
+  const allowList = allow?.length ? allow : undefined;
+  const denyList = deny?.length ? deny : undefined;
+
+  const pushUnique = (list: VerifyHit[], seen: Set<string>, hit: VerifyHit, key: string) => {
+    if (seen.has(key)) return;
+    seen.add(key);
+    list.push(hit);
+  };
+
+  const blockedByRules = (master: GraphNode, given: string): boolean => {
+    if (denyList) {
+      const denied =
+        denyList.some((rule) => ruleMatches(index, master, rule)) ||
+        denyList.some((rule) => rule.trim().toLowerCase() === given.trim().toLowerCase());
+      if (denied) return true;
+    }
+    if (allowList) {
+      const allowed =
+        allowList.some((rule) => ruleMatches(index, master, rule)) ||
+        allowList.some((rule) => rule.trim().toLowerCase() === given.trim().toLowerCase());
+      if (!allowed) return true;
+    }
+    return false;
+  };
+
+  const considerMaster = (master: GraphNode, given: string) => {
+    if (blockedByRules(master, given)) {
+      pushUnique(invents, seenInvent, { name: master.name, id: master.id, figmaNodeId: master.figmaNodeId, reason: "denied" }, `denied:${master.id}`);
+      return;
+    }
+    if (master.status === "deprecated") {
+      pushUnique(
+        deprecatedHits,
+        seenDeprecated,
+        { name: master.name, id: master.id, figmaNodeId: master.figmaNodeId, status: "deprecated" },
+        master.id,
+      );
+      return;
+    }
+    approvedIds.add(master.id);
+  };
+
+  let frameNode: GraphNode | undefined;
+  const frameName = input.frame?.trim();
+  if (frameName) {
+    frameNode = resolveNode(index, frameName);
+    if (!frameNode) {
+      pushUnique(
+        unresolved,
+        seenUnresolved,
+        { name: frameName, reason: "frame-not-in-graph" },
+        `frame:${frameName}`,
+      );
+    } else {
+      for (const instance of index.getNestedInstances(frameNode.id)) {
+        const main = index.getMainComponent(instance.id);
+        if (!main) {
+          pushUnique(
+            unresolved,
+            seenUnresolved,
+            { name: instance.name, id: instance.id, reason: "unresolved-instance" },
+            instance.id,
+          );
+          continue;
+        }
+        considerMaster(main, main.name);
+      }
+    }
+  }
+
+  for (const raw of input.components ?? []) {
+    const given = raw.trim();
+    if (!given) continue;
+    const node = resolveNode(index, given);
+    if (!node) {
+      pushUnique(invents, seenInvent, { name: given, reason: "not-in-graph" }, `invent:${given.toLowerCase()}`);
+      continue;
+    }
+    const master = asMaster(index, node);
+    if (!master) {
+      pushUnique(
+        invents,
+        seenInvent,
+        { name: node.name, id: node.id, figmaNodeId: node.figmaNodeId, reason: "not-a-master" },
+        `invent:${node.id}`,
+      );
+      continue;
+    }
+    considerMaster(master, given);
+  }
+
+  const pass = invents.length === 0 && deprecatedHits.length === 0 && unresolved.length === 0;
+  return withCost({
+    pass,
+    approved: approvedIds.size,
+    invents,
+    deprecated: deprecatedHits,
+    unresolved,
+    frame: frameNode ? briefNode(frameNode) : undefined,
+    builtAt: index.graph.builtAt,
+    hint: pass
+      ? `Only approved library masters. ${REFRESH_HINT}`
+      : `Fail — invents/deprecated/unresolved listed. Replace invents with recommend() figmaNodeIds. ${REFRESH_HINT}`,
   });
 }

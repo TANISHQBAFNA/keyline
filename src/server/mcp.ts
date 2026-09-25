@@ -47,10 +47,10 @@ function handle(request: Request): void {
         capabilities: { tools: { listChanged: false } },
         serverInfo: SERVER_INFO,
         instructions:
-          "Call resolve first (component usage card). Then Figma on that figmaNodeId. " +
-          "Do not Read graph.json. Ingest the shared Figma node-id, not the whole file. " +
-          "Skill tools: resolve, get_screen_inventory, check_frame. " +
-          "Do not get_design_context on a FRAME or SECTION until resolve returns an id.",
+          "Call recommend(intent) first, then Figma on returned figmaNodeIds, then verify_frame. " +
+          "Do not Read graph.json. Ingest the shared Figma node-id, not the whole file. Re-ingest to refresh. " +
+          "Skill tools: recommend, resolve, verify_frame, get_screen_inventory, check_frame. " +
+          "Do not get_design_context on a FRAME or SECTION until recommend/resolve returns an id.",
       });
       return;
 

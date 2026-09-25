@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — recommend + verify_frame
+
+Closed loop so reuse is measurable. Designers still set the library; agents draft from stored Figma masters.
+
+- **`recommend`** — free-text intent → ranked masters/variants (`figmaNodeId`, where-used, slots, deprecated demoted). MCP, CLI `npm run resolve -- recommend "…"`, skill docs.
+- **`verify_frame`** — after a draw, pass/fail invents / deprecated / unresolved. Optional `.graphify/library-rules.json` allow/deny. Else in-graph master + not deprecated = approved. Deterministic, no LLM.
+- **Refresh** — re-run `resolve ingest` before recommend/verify if the Figma library changed. No live-sync rewrite.
+- Recipes (ordered screen sequences) are **not** in this release.
+
+Happy path: ingest → recommend(intent) → Figma with returned ids → verify_frame. Do not Read `graph.json`.
+
 ## Unreleased — toolchain upgrade (2026-09-20)
 
 Framework and test-runner bump only. No UI redesign, no Figma API rewrite, no graph-library swap.
