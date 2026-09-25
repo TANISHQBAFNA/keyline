@@ -12,8 +12,9 @@ The real power of Resolve: a human designer defines the UI guidelines, component
 
 1. **You** set rules, guidelines, and what may be used  
 2. **Resolve** holds the map of your Figma library  
-3. **AI** drafts screens from those masters  
-4. **You** judge taste  
+3. **AI** asks Resolve what to reuse (`recommend`), then drafts from those masters  
+4. **Resolve** checks the draft (`verify_frame`) so invent rate is visible  
+5. **You** judge taste  
 
 So Resolve is not “AI that designs.” It is **your rules, made easy for AI to follow** — without pasting the whole Figma file into chat.
 
@@ -35,6 +36,7 @@ You don’t need to be a developer. If you can clone a GitHub repo and paste a F
 2. **Faster screen drafts** — less guessing, more reuse  
 3. **Short answers** — “what is this / where is it used?” in a small card, not a giant dump  
 4. **Safer drawing** — AI gets the right Figma component id for your masters  
+5. **Measurable reuse** — `recommend` ranks library masters from a brief; `verify_frame` flags invents  
 
 ---
 
@@ -70,15 +72,17 @@ You do **not** need a Figma personal access token for normal use.
 ### 4. Use it day to day
 
 1. Paste a link to a **screen or frame** in Figma (not the whole file unless you really want that).  
-2. Ask the AI to pull that screen into Resolve (through Figma MCP).  
-3. Ask Resolve for each main component you’ll use, for example:
+2. Ask the AI to pull that screen into Resolve (through Figma MCP). Re-ingest when the library changes.  
+3. Ask Resolve what to reuse from a brief, then optionally confirm a named master:
 
 ```bash
+npm run resolve -- recommend "checkout summary with primary button"
 npm run resolve -- resolve "Component Name"
+npm run resolve -- verify "Checkout Summary"
 ```
 
-4. Let the AI design using those components.  
-5. You review for taste — Resolve is not the taste judge.
+4. Let the AI design using those components (`figmaNodeId` from the card).  
+5. You review for taste — Resolve is not the taste judge. `verify_frame` only checks library reuse.
 
 **Tip:** Prefer the command name `resolve` if you see an older name like `keyline` or `graphify`. `npm run keyline` still works as a deprecated alias for this release.
 
@@ -124,5 +128,6 @@ License: [`LICENSE`](LICENSE) (MIT)
 | Now | Next ideas |
 |-----|------|
 | Map + search + short AI cards | Clearer reports on design-system usage |
+| `recommend` + `verify_frame` (invent rate) | Screen recipes (ordered masters + slots) |
 | Works with MCP / plugin | Smoother live Figma links and previews |
 | | Optional in-app AI helpers |

@@ -26,25 +26,27 @@ npm run build:server   # first time / after pull
 npm run resolve -- ingest '<pasted-figma-url>'
 ```
 
-3. **`resolve "<component>"`** — screens, counts, slot fills, `figmaNodeId`. Cap ~2000 chars.
+3. **`recommend "<intent>"`** — ranked masters, `figmaNodeId`, where-used. Cap ~2000 chars.
+   **`resolve "<component>"`** — usage card when you already know the name.
 
 Do **not**:
 
 - Read `.graphify/graph.json` or dump REST JSON
 - Strip `?node-id=` and fetch the whole file
 - Map every screen unless the user asked for the whole file
-- Call `get_design_context` on a FRAME or SECTION until `resolve` returns an id
+- Call `get_design_context` on a FRAME or SECTION until `recommend`/`resolve` returns an id
 - Start from `orient` / `explain` / `get_subgraph`
 
 ## Create / recreate a screen (Figma or code)
 
-1. `resolve "Main Card"` (repeat for Header, Input Field, Special Button, …).
+1. `recommend "pay now with primary button"` (or `resolve "Main Card"` if you already know the name).
 2. `use_figma` / `get_design_context` on **that** `figmaNodeId` only.
-3. Reuse names from the card. Do not invent primitives the card already lists.
+3. `verify_frame` on the new frame or placed names. Do not invent primitives the card already lists.
+4. Reuse names from the card.
 
-Frame name (`resolve "Portfolio"`) returns a screen inventory (each component once, with a count). Analog for a **new** screen: `check_frame "pay now buttons"`.
+Frame name (`resolve "Portfolio"`) returns a screen inventory (each component once, with a count). Analog shortcut: `check_frame "pay now buttons"`. Prefer `recommend` when the family is unknown.
 
-Skill tools: `resolve`, `get_screen_inventory`, `check_frame`.
+Skill tools: `recommend`, `resolve`, `verify_frame`, `get_screen_inventory`, `check_frame`.
 
 ## Whole file
 

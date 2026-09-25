@@ -1,20 +1,21 @@
 ---
 name: resolve
-description: Use Resolve before any Figma screen build or design-from-brief work in Cursor. Call resolve for a cheap component usage card. Never Read graph.json.
+description: Use Resolve before any Figma screen build or design-from-brief work in Cursor. Call recommend for ranked masters from a brief, then verify_frame after drawing. Never Read graph.json.
 ---
 
 # Resolve
 
-Use Resolve before any Figma screen build or design-from-brief work in Cursor. Call `resolve` for a cheap component usage card. **Never Read `graph.json`.**
+Use Resolve before any Figma screen build or design-from-brief work in Cursor. **Never Read `graph.json`.**
 
 Tagline: **Figma rules. Agents resolve.**
 
 ## Process
 
-1. **Brief** — clarify what screen or component set is needed
-2. **Resolve** — get component usage cards (masters, variants, props)
-3. **Draw** — build in Figma using resolved `figmaNodeId`s only
-4. **Human taste** — pause for review; do not over-generate
+1. **Ingest** — store the library graph (re-run when Figma changes)
+2. **Recommend** — brief/intent → ranked masters (`figmaNodeId`, variants, where-used)
+3. **Draw** — Figma MCP using returned ids only; do not invent one-offs
+4. **Verify** — `verify_frame` flags invents / deprecated / unresolved
+5. **Human taste** — pause for review; do not over-generate
 
 Prefer **resolve** over any `keyline` / `graphify` alias when both exist. `npm run keyline` is a deprecated alias for `npm run resolve` this release.
 
@@ -24,29 +25,37 @@ Prefer **resolve** over any `keyline` / `graphify` alias when both exist. `npm r
 # Build the Resolve server/CLI
 npm run build:server
 
-# Ingest a Figma file (or design URL)
+# Ingest a Figma file (or design URL). Re-run to refresh the library.
 npm run resolve -- ingest '<url>'
 
-# Resolve a named master / component (CLI verb is `resolve`)
+# Ranked masters from a brief (agent does not need the component name)
+npm run resolve -- recommend "checkout summary with primary button and input"
+
+# Usage card when you already know the master name
 npm run resolve -- resolve "Main Card"
 npm run resolve -- resolve "Input Field"
-npm run resolve -- resolve "Badge"
+
+# After drawing: invent rate
+npm run resolve -- verify "Checkout Summary"
+npm run resolve -- verify --components "Button,MadeUpCard"
 ```
 
-Run resolve for every master you plan to place before calling Figma tools.
+Optional allow/deny: `.graphify/library-rules.json` `{ "allow": ["Button"], "deny": ["Banner"] }`. If that file is missing, approved = in-graph MAIN_COMPONENT / VARIANT (or COMPONENT_SET) and not deprecated.
 
 ## Create a screen
 
-1. From the brief, list masters (e.g. Main Card, Input Field, Badge).
-2. `npm run resolve -- resolve "<Name>"` for each — note `figmaNodeId` and usage card.
-3. Call `use_figma` / `get_design_context` **only** with those `figmaNodeId`s.
-4. **Never** `Read` `.graphify/graph.json` (or any `graph.json`). Resolve cards are the source of truth for usage.
+1. `recommend "<intent>"` — note `figmaNodeId`s. Do not invent names.
+2. Call `use_figma` / `get_design_context` **only** with those `figmaNodeId`s.
+3. `verify_frame` on the new frame or the placed name list.
+4. **Never** `Read` `.graphify/graph.json` (or any `graph.json`). Cards are the source of truth.
+
+Skill tools: `recommend`, `resolve`, `verify_frame`, `get_screen_inventory`, `check_frame` (analog shortcut).
 
 ## Caps
 
 | Level | When |
 |-------|------|
-| **Level-1** (default) | Single component / local edit — resolve + place |
+| **Level-1** (default) | Single component / local edit — recommend + place + verify |
 | **Level-2** | Only when blast radius is large (shared masters, multi-screen impact) |
 | **Whole-file** | Only if the user explicitly asks |
 

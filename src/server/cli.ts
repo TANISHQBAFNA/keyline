@@ -17,9 +17,11 @@ import {
   explainNode,
   pathBetween,
   queryQuestion,
+  recommendMasters,
   toGraphReportMarkdown,
+  verifyFrame,
 } from "@/core/query";
-import { deleteGraph, graphIdFor, graphPath, listGraphs, rebuildIndex, resolveGraph, saveGraph, storeRoot } from "./store";
+import { deleteGraph, graphIdFor, graphPath, listGraphs, readLibraryRules, rebuildIndex, resolveGraph, saveGraph, storeRoot } from "./store";
 
 /**
  * Resolve CLI — ingest once into `.graphify/graph.json`.
@@ -37,15 +39,22 @@ function usage(): void {
       "      Live Figma: pass the shared screen/frame/section URL (node-id in the link).",
       "      No node-id → each top-level screen, one request at a time. --scope file = whole dump.",
       "      Token from FIGMA_ACCESS_TOKEN. Writes .graphify/graph.json — agents call resolve, do not Read that file.",
+      "      Re-run ingest to refresh the library before recommend / verify_frame.",
       "",
+      "  resolve recommend \"<intent>\" [--id] [--budget <chars>]",
+      "      Ranked masters for a brief. figmaNodeId, variants, where-used. Deprecated demoted.",
+      "      Agent does not need the component name. Cap ~2000 chars. Do not Read graph.json.",
       "  resolve resolve \"<name>\" [--id] [--budget <chars>]",
-      "      Usage card: screens, slot fills, figmaNodeId. Agents: start here. Do not Read graph.json.",
-      "  resolve orient [--id <graphId>]     Optional god-node summary. Prefer resolve.",
+      "      Usage card: screens, slot fills, figmaNodeId. When you already know the name.",
+      "  resolve verify \"<frame>\" [--id] [--components a,b] [--rules <file>]",
+      "      After drawing: pass/fail, invents, deprecated, unresolved. Measures invent rate.",
+      "      Optional .graphify/library-rules.json { allow, deny }. Else in-graph + not deprecated = approved.",
+      "  resolve orient [--id <graphId>]     Optional god-node summary. Prefer recommend / resolve.",
       "  resolve query \"<question>\" [--id] [--budget <chars>]",
-      "      Optional scoped subgraph. Agents should resolve a component name instead.",
+      "      Optional scoped subgraph. Agents should recommend or resolve a component instead.",
       "  resolve path \"<A>\" \"<B>\" [--id]     Shortest relationship path",
       "  resolve explain \"<name>\" [--id]      Bounded markdown brief for one node",
-      "  resolve check \"<intent>\" [--id]      Analog variant + deprecated to avoid",
+      "  resolve check \"<intent>\" [--id]      Analog variant + deprecated to avoid (prefer recommend)",
       "",
       "  resolve list                 Show the stored graph",
       "  resolve reindex              Confirm graph.json loads",
@@ -152,7 +161,7 @@ function requireGraph(args: string[]) {
   const resolved = resolveGraph(flag(args, "id"));
   if (!resolved) {
     throw new Error(
-      "No graph stored. Ingest first (`resolve ingest <figma-url>`). Then read `.graphify/graph.json`.",
+      "No graph stored. Ingest first (`resolve ingest <figma-url>`). Then call recommend / resolve — do not Read graph.json.",
     );
   }
   return resolved;
@@ -198,6 +207,18 @@ async function main(argv: string[]): Promise<void> {
       throw new Error(
         `No file at ${target}. Pass a JSON path, a Figma URL, or a file key (with FIGMA_ACCESS_TOKEN).`,
       );
+    }
+
+    case "recommend": {
+      const intent = positionals(args)[0];
+      if (!intent) throw new Error('Usage: resolve recommend "<intent>"');
+      const budget = Number(flag(args, "budget"));
+      printJson(
+        recommendMasters(requireGraph(args).index, intent, {
+          budgetChars: Number.isFinite(budget) && budget > 0 ? budget : undefined,
+        }),
+      );
+      return;
     }
 
     case "resolve": {
@@ -252,6 +273,29 @@ async function main(argv: string[]): Promise<void> {
       const intent = positionals(args)[0];
       if (!intent) throw new Error('Usage: resolve check "<intent>"');
       printJson(checkFrame(requireGraph(args).index, intent));
+      return;
+    }
+
+    case "verify": {
+      const frame = positionals(args)[0];
+      const componentsRaw = flag(args, "components");
+      const components = componentsRaw
+        ? componentsRaw
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean)
+        : undefined;
+      if (!frame && !components?.length) {
+        throw new Error('Usage: resolve verify "<frame>" [--components a,b] [--rules file]');
+      }
+      const rulesPath = flag(args, "rules");
+      printJson(
+        verifyFrame(requireGraph(args).index, {
+          frame,
+          components,
+          rules: readLibraryRules(rulesPath),
+        }),
+      );
       return;
     }
 

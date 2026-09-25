@@ -34,32 +34,44 @@ npm run resolve -- --help
 
 ## Ingest a Figma file
 
-Once per file (or when the design source changes):
+Once per file (**re-run when the design library changes** — this is the refresh path):
 
 ```bash
 npm run resolve -- ingest '<figma-file-or-design-url>'
 ```
 
-## Resolve (everyday)
+## Recommend → draw → verify (everyday)
 
-Before placing anything in Figma, resolve masters for a cheap usage card. The CLI **verb** is `resolve`:
+Agent does not need the component name. Cards stay the interface — **do not** `Read` `.graphify/graph.json`.
+
+```bash
+npm run resolve -- recommend "checkout summary with primary button and input"
+npm run resolve -- verify "Checkout Summary"
+npm run resolve -- verify --components "Button,MadeUpCard"
+```
+
+Each `recommend` card includes `figmaNodeId`, variant props, where-used, and flags deprecated masters (ranked last). Cap ~2000 chars.
+
+When you already know the master name:
 
 ```bash
 npm run resolve -- resolve "Main Card"
 npm run resolve -- resolve "Input Field"
-npm run resolve -- resolve "Badge"
 ```
 
 Use the card + `figmaNodeId`. Prefer **resolve** over any keyline / graphify alias.
 
+Optional allow/deny file: `.graphify/library-rules.json` with `{ "allow": [...], "deny": [...] }`. If missing, approved = in-graph master and not deprecated.
+
 ## Everyday screen flow
 
-1. **Brief** — what screen / states you need
-2. **Resolve** — every master you will use
+1. **Ingest** — (refresh) store the library
+2. **Recommend** — brief → ranked masters
 3. **Draw** — `use_figma` / `get_design_context` on those `figmaNodeId`s only
-4. **Human taste** — review before expanding scope
+4. **Verify** — invents / deprecated / unresolved
+5. **Human taste** — review before expanding scope
 
-**Do not** `Read` `.graphify/graph.json`. Resolve is the cheap path.
+**Do not** `Read` `.graphify/graph.json`. Resolve cards are the cheap path.
 
 ## Caps
 

@@ -6,22 +6,25 @@ import {
   componentUsageCard,
   explainNode,
   extractSubgraph,
+  parseLibraryRules,
   pathBetween,
   queryQuestion,
+  recommendMasters,
   screenInventory,
   searchNodes,
   usageCardForComponent,
   usageSummaryFor,
+  verifyFrame,
   withCost,
   type GraphIndex,
   type GraphLevel,
   type ViewMode,
 } from "@/core/query";
 import { buildAiGraphContext, toMarkdownPrompt } from "@/core/ai";
-import { listGraphs, resolveGraph } from "./store";
+import { listGraphs, readLibraryRules, resolveGraph } from "./store";
 
 /**
- * Optional MCP tools. Agents: resolve / get_screen_inventory / check_frame.
+ * Optional MCP tools. Agents: recommend / resolve / verify_frame / check_frame.
  * Do not Read graph.json. Graph stays on disk.
  */
 
@@ -40,6 +43,23 @@ const graphIdProperty = {
 
 export const TOOLS: ToolDefinition[] = [
   {
+    name: "recommend",
+    description:
+      "Intent in, ranked library masters out. Agent does not need the component name. Returns figmaNodeId, variant props, where-used, deprecated flagged/demoted. Cap ~2000 chars. Happy path: ingest → recommend → Figma with returned ids → verify_frame. Do not Read graph.json.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...graphIdProperty,
+        intent: {
+          type: "string",
+          description: 'Free-text brief, e.g. "approval summary with primary button and input"',
+        },
+        budgetChars: { type: "number", description: "Hard cap on JSON chars. Default 2000." },
+      },
+      required: ["intent"],
+    },
+  },
+  {
     name: "resolve",
     description:
       "Name in, usage card out. Where a component is used (screen names, counts, slot fills, figmaNodeId). Frame names return a screen inventory. Call this instead of reading graph.json. Cap ~2000 chars.",
@@ -56,7 +76,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "orient",
     description:
-      "Start here only if you have not called resolve. God nodes and communities. Prefer resolve.",
+      "Start here only if you have not called recommend or resolve. God nodes and communities. Prefer recommend.",
     inputSchema: { type: "object", properties: { ...graphIdProperty } },
   },
   {
@@ -104,7 +124,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "check_frame",
     description:
-      "Given a new screen intent (e.g. 'approval summary buttons'), recommend the variant similar screens nest and list deprecated ones to avoid. Deterministic — does not call an LLM.",
+      "Analog shortcut: given a new screen intent, pick the variant similar screens nest and list deprecated ones to avoid. Prefer `recommend` when you do not know the component family. Deterministic — does not call an LLM.",
     inputSchema: {
       type: "object",
       properties: {
@@ -112,6 +132,30 @@ export const TOOLS: ToolDefinition[] = [
         intent: { type: "string", description: 'e.g. "approval summary buttons"' },
       },
       required: ["intent"],
+    },
+  },
+  {
+    name: "verify_frame",
+    description:
+      "After drawing, check a frame or a proposed component list against the library graph. Pass iff every placement is an in-graph MAIN_COMPONENT/VARIANT (or COMPONENT_SET) and not deprecated. Flags invents, deprecated, unresolved. Optional allow/deny rules file. Deterministic — no LLM. Use to measure invent rate.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...graphIdProperty,
+        frame: { type: "string", description: "Frame name, graph id, or figmaNodeId." },
+        components: {
+          type: "array",
+          items: { type: "string" },
+          description: "Placed component names or ids (proposed or observed).",
+        },
+        rulesFile: {
+          type: "string",
+          description:
+            "Optional JSON { allow, deny }. If omitted, uses .graphify/library-rules.json when that file exists; otherwise in-graph + not deprecated = approved.",
+        },
+        allow: { type: "array", items: { type: "string" }, description: "Inline allow list (names or ids)." },
+        deny: { type: "array", items: { type: "string" }, description: "Inline deny list (names or ids)." },
+      },
     },
   },
   {
@@ -228,6 +272,33 @@ const asNumber = (value: unknown, fallback: number, cap: number): number => {
   return Math.min(parsed, cap);
 };
 
+const asStringList = (value: unknown): string[] | undefined => {
+  if (typeof value === "string") {
+    const items = value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    return items.length ? items : undefined;
+  }
+  if (!Array.isArray(value)) return undefined;
+  const items = value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+  return items.length ? items.map((item) => item.trim()) : undefined;
+};
+
+function libraryRulesFromArgs(args: Record<string, unknown>) {
+  const inline = parseLibraryRules({ allow: args["allow"], deny: args["deny"] });
+  try {
+    const fromFile = readLibraryRules(typeof args["rulesFile"] === "string" ? args["rulesFile"] : undefined);
+    if (!fromFile && !inline.allow && !inline.deny) return undefined;
+    return {
+      allow: inline.allow ?? fromFile?.allow,
+      deny: inline.deny ?? fromFile?.deny,
+    };
+  } catch (error) {
+    throw new ToolError(error instanceof Error ? error.message : String(error));
+  }
+}
+
 function context(args: Record<string, unknown>) {
   const graphId = typeof args["graphId"] === "string" ? args["graphId"] : undefined;
   const resolved = resolveGraph(graphId);
@@ -303,9 +374,31 @@ function dispatchTool(name: string, args: Record<string, unknown>): unknown {
       return explainNode(index, asString(args["name"] ?? args["nodeId"], "name"), task);
     }
 
+    case "recommend": {
+      const { index } = context(args);
+      const budget = typeof args["budgetChars"] === "number" ? args["budgetChars"] : undefined;
+      return recommendMasters(index, asString(args["intent"] ?? args["question"] ?? args["query"], "intent"), {
+        budgetChars: budget,
+      });
+    }
+
     case "check_frame": {
       const { index } = context(args);
       return checkFrame(index, asString(args["intent"] ?? args["question"], "intent"));
+    }
+
+    case "verify_frame": {
+      const { index } = context(args);
+      const frame = typeof args["frame"] === "string" ? args["frame"] : undefined;
+      const components = asStringList(args["components"]);
+      if (!frame && !components) {
+        throw new ToolError("`frame` or `components` is required.");
+      }
+      return verifyFrame(index, {
+        frame,
+        components,
+        rules: libraryRulesFromArgs(args),
+      });
     }
 
     case "list_graphs": {
@@ -313,7 +406,7 @@ function dispatchTool(name: string, args: Record<string, unknown>): unknown {
       return {
         graphs,
         hint: graphs.length
-          ? "Call resolve \"<component>\" (usage card), then Figma on that figmaNodeId. Do not Read graph.json."
+          ? "Call recommend \"<intent>\" then Figma on returned figmaNodeIds, then verify_frame. Do not Read graph.json."
           : "Nothing stored yet. Ingest a Figma URL or JSON export first.",
       };
     }

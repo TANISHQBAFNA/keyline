@@ -18,13 +18,13 @@ Boundaries: code/commits/PRs written normal.
 
 ## Resolve
 
-Use Resolve before any Figma screen build or design-from-brief work. Call `resolve` for a cheap component usage card. **Never Read `graph.json`.**
+Use Resolve before any Figma screen build or design-from-brief work. **Never Read `graph.json`.**
 
 Tagline: **Figma rules. Agents resolve.**
 
 ### Process
 
-brief → resolve → draw → human taste
+ingest → recommend(intent) → draw (figmaNodeId) → verify_frame → human taste
 
 Prefer **resolve** over any `keyline` / `graphify` alias.
 
@@ -32,21 +32,21 @@ Prefer **resolve** over any `keyline` / `graphify` alias.
 
 ```bash
 npm run build:server
-npm run resolve -- ingest '<url>'
-npm run resolve -- resolve "Main Card"
-npm run resolve -- resolve "Input Field"
-npm run resolve -- resolve "Badge"
+npm run resolve -- ingest '<url>'          # re-run to refresh library
+npm run resolve -- recommend "checkout with primary button"
+npm run resolve -- resolve "Main Card"     # when you already know the name
+npm run resolve -- verify "Checkout"
 ```
 
 ### Create a screen
 
-1. Resolve masters from the brief (`Main Card`, `Input Field`, `Badge`, etc.).
-2. Use `use_figma` / `get_design_context` on the returned `figmaNodeId` only.
-3. Never `Read` `.graphify/graph.json`.
+1. `recommend` the brief — ranked masters, `figmaNodeId`, deprecated demoted.
+2. Use `use_figma` / `get_design_context` on the returned `figmaNodeId` only. Do not invent one-offs.
+3. `verify_frame` the new frame or placed names (invents / deprecated / unresolved).
+4. Never `Read` `.graphify/graph.json`.
 
 ### Caps
 
 - **Level-1** (default): single component / local edit
 - **Level-2**: only for large blast radius
 - **Whole-file**: only if explicitly asked
-

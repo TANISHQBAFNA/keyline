@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { DesignGraphSchema, type DesignGraph } from "@/core/model";
-import { indexGraph, type GraphIndex } from "@/core/query";
+import { indexGraph, parseLibraryRules, type GraphIndex, type LibraryRules } from "@/core/query";
 
 /**
  * Durable graph store. One file:
@@ -36,6 +36,21 @@ export function storeRoot(): string {
 
 export function graphPath(): string {
   return join(storeRoot(), "graph.json");
+}
+
+/** Optional allow/deny list next to graph.json. Missing file = graph status rules. */
+export function libraryRulesPath(): string {
+  return join(storeRoot(), "library-rules.json");
+}
+
+export function readLibraryRules(explicitPath?: string): LibraryRules | undefined {
+  const path = explicitPath ?? (existsSync(libraryRulesPath()) ? libraryRulesPath() : undefined);
+  if (!path) return undefined;
+  if (!existsSync(path)) {
+    throw new Error(`Library rules file not found: ${path}`);
+  }
+  const raw: unknown = JSON.parse(readFileSync(path, "utf8"));
+  return parseLibraryRules(raw);
 }
 
 /** Stable id derived from the file it came from. Display only — the file is always graph.json. */
