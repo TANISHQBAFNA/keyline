@@ -1,5 +1,7 @@
 # Resolve — architecture
 
+Building Resolve? See this file. Using Resolve as a designer? Start at [GUIDE.md](GUIDE.md).
+
 ## 1. The problem, restated
 
 A Figma file is a tree that nobody can see. The structure that matters —

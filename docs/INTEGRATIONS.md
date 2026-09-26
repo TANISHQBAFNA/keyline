@@ -1,5 +1,7 @@
 # Integration guide
 
+Building Resolve? See this file. Using Resolve as a designer? Start at [GUIDE.md](GUIDE.md).
+
 Everything below plugs into an existing seam. None of it requires changing the
 graph model, the query layer or the UI.
 
