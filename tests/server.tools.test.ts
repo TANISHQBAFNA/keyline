@@ -3,15 +3,19 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { TOOLS, callTool } from "@/server/tools";
+import { clearCache, saveGraph } from "@/server/store";
+import { graph } from "./fixture";
 
 describe("agent tools", () => {
   const previousHome = process.env["GRAPHIFY_HOME"];
 
   beforeEach(() => {
     process.env["GRAPHIFY_HOME"] = mkdtempSync(join(tmpdir(), "resolve-tools-"));
+    clearCache();
   });
 
   afterEach(() => {
+    clearCache();
     if (previousHome === undefined) delete process.env["GRAPHIFY_HOME"];
     else process.env["GRAPHIFY_HOME"] = previousHome;
   });
@@ -32,7 +36,30 @@ describe("agent tools", () => {
   });
 
   it("list_recipes returns the starter pack without a stored graph", () => {
-    const result = callTool("list_recipes", {}) as { recipes: Array<{ id: string }> };
+    const result = callTool("list_recipes", {}) as {
+      recipes: Array<{
+        id: string;
+        slots: Array<{ status: string; master?: unknown; nextRecommend?: string }>;
+      }>;
+    };
     expect(result.recipes.some((recipe) => recipe.id === "checkout-summary")).toBe(true);
+    const checkout = result.recipes.find((recipe) => recipe.id === "checkout-summary");
+    expect(checkout?.slots.every((slot) => slot.status === "unbound")).toBe(true);
+    expect(checkout?.slots.every((slot) => !slot.master)).toBe(true);
+    expect(checkout?.slots.some((slot) => slot.nextRecommend)).toBe(true);
+  });
+
+  it("list_recipes binds live masters when a graph is stored", () => {
+    saveGraph(graph);
+    const result = callTool("list_recipes", {}) as {
+      recipes: Array<{
+        id: string;
+        slots: Array<{ role: string; status: string; master?: { id: string; figmaNodeId?: string } }>;
+      }>;
+    };
+    const checkout = result.recipes.find((recipe) => recipe.id === "checkout-summary");
+    const bound = checkout?.slots.filter((slot) => slot.status === "filled" || slot.status === "bound");
+    expect(bound?.length).toBeGreaterThan(0);
+    expect(bound?.every((slot) => slot.master?.id && slot.master.figmaNodeId)).toBe(true);
   });
 });

@@ -1,24 +1,21 @@
 ---
-description: Resolve before any Figma tools or design-from-brief work. Never Read graph.json.
+description: Resolve before any Figma tools or design-from-brief work. Never Read graph.json. Never invent components.
 alwaysApply: true
 ---
 
-# Resolve — resolve before Figma
+# Resolve — forced path
 
-Before any Figma screen build, `use_figma`, `get_design_context`, or design-from-brief work:
+Before any Figma screen build, `use_figma`, `get_design_context`, or design-from-brief work, do this in order:
 
 1. Prefer **resolve** over keyline / graphify aliases.
-2. Re-ingest if the Figma library changed: `npm run resolve -- ingest '<url>'`.
-3. Optional pack: `npm run resolve -- recipe "<screen job>"`.
-4. `npm run resolve -- recommend "<intent>"` — ranked masters for unbound slots. Use returned `figmaNodeId`s only.
+2. Ingest (refresh if the library changed): `npm run resolve -- ingest '<url>'`.
+3. If the screen job matches a pack: `npm run resolve -- recipe list` then `recipe "<job>"`.
+4. Unbound slots: `npm run resolve -- recommend "<intent>"`. Place returned `figmaNodeId`s only.
 5. After drawing: `npm run resolve -- verify "<frame>"` (or `--components a,b`).
-6. **Never** Read `.graphify/graph.json` or any `graph.json`.
 
-Process: ingest → (optional) recipe → recommend → draw → verify_frame → human taste.
+**Never** invent components. **Never** Read `.graphify/graph.json` or dump the graph.
 
 Caps: Level-1 default; Level-2 only for blast radius; whole-file only if asked.
-
-Commands:
 
 ```bash
 npm run build:server

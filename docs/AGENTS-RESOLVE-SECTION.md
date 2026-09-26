@@ -1,36 +1,36 @@
-## Resolve
+## Resolve — forced path (copy this)
 
-Use Resolve before any Figma screen build or design-from-brief work. **Never Read `graph.json`.**
+Use Resolve before any Figma screen build or design-from-brief work. **Never Read `graph.json`.** Never invent components.
 
 Tagline: **Figma rules. Agents resolve.**
 
-### Process
-
-ingest → (optional) recipe → recommend unbound slots → draw (figmaNodeId) → verify_frame → human taste
-
-Prefer **resolve** over any `keyline` / `graphify` alias.
-
-### Commands
+### Do this, in order
 
 ```bash
 npm run build:server
-npm run resolve -- ingest '<url>'          # re-run to refresh library
-npm run resolve -- recipe list
+npm run resolve -- ingest '<url>'          # re-run if the library changed
+npm run resolve -- recipe list             # after ingest, slots bind to live ids
 npm run resolve -- recipe "checkout summary"
 npm run resolve -- recommend "checkout with primary button"
-npm run resolve -- resolve "Main Card"     # when you already know the name
+# place ONLY the returned figmaNodeIds
 npm run resolve -- verify "Checkout"
 ```
 
-### Create a screen
+1. **Ingest** — refresh if the Figma library changed.
+2. **Recipe** — if the screen job matches a pack. Overlay `.graphify/recipes.json` still wins.
+3. **Recommend** — unbound / missing / deprecated slots (`nextRecommend` on the card).
+4. **Place** — `use_figma` / `get_design_context` on returned ids only.
+5. **Verify** — `verify_frame` (invents / deprecated / unresolved).
 
-1. Optional: `recipe` the screen job — pack of masters + slots with `figmaNodeId`s.
-2. `recommend` unbound slots — ranked masters, deprecated demoted. Do not invent one-offs.
-3. Use `use_figma` / `get_design_context` on the returned `figmaNodeId` only.
-4. `verify_frame` the new frame or placed names (invents / deprecated / unresolved).
-5. Never `Read` `.graphify/graph.json`.
+### Forbidden
+
+- Invent components, names, or node ids.
+- `Read` `.graphify/graph.json` or dump the graph.
+- `get_design_context` on a FRAME until recipe/recommend/resolve returned that id.
 
 Designers add recipes in JSON (`src/data/recipes.json` or `.graphify/recipes.json`). See `docs/RECIPES.md`.
+
+Prefer **resolve** over any `keyline` / `graphify` alias.
 
 ### Caps
 

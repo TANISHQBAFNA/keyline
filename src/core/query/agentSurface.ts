@@ -806,9 +806,54 @@ export interface RecommendCandidate {
   hint: string;
 }
 
+function sameFamily(a: GraphNode, b: GraphNode): boolean {
+  if (a.id === b.id) return true;
+  if (a.componentSetId && (a.componentSetId === b.id || a.componentSetId === b.componentSetId)) return true;
+  if (b.componentSetId && b.componentSetId === a.id) return true;
+  return false;
+}
+
+function variantHaystack(node: GraphNode): string {
+  const props = node.variantProperties;
+  if (!props) return "";
+  return Object.entries(props)
+    .flatMap(([key, value]) => [key, value])
+    .join(" ");
+}
+
+function setOf(index: GraphIndex, node: GraphNode): GraphNode | undefined {
+  if (node.type === "COMPONENT_SET") return node;
+  return node.componentSetId ? index.getNode(node.componentSetId) : undefined;
+}
+
+/** Unique masters nested on each screen frame. */
+function mastersByScreen(index: GraphIndex): Map<string, GraphNode[]> {
+  const byScreen = new Map<string, GraphNode[]>();
+  for (const frame of index.getNodesByType("FRAME")) {
+    if (!isScreen(index, frame)) continue;
+    const seen = new Map<string, GraphNode>();
+    for (const instance of index.getNestedInstances(frame.id)) {
+      const main = index.getMainComponent(instance.id);
+      if (main) seen.set(main.id, main);
+    }
+    byScreen.set(frame.id, [...seen.values()]);
+  }
+  return byScreen;
+}
+
+function screensOfMaster(index: GraphIndex, node: GraphNode): GraphNode[] {
+  const seen = new Map<string, GraphNode>();
+  for (const instance of index.getAllInstancesOf(node.id)) {
+    const screen = screenOf(index, instance.id);
+    if (screen) seen.set(screen.id, screen);
+  }
+  return [...seen.values()];
+}
+
 /**
  * Brief/intent → ranked library masters. Agent does not need the component
- * name. Deprecated demoted. Never invents a component that is not in the graph.
+ * name. Name/intent, variant props, where-used + sibling co-occurrence, live
+ * over stale, deprecated demoted. Never invents a component that is not in the graph.
  */
 export function recommendMasters(
   index: GraphIndex,
@@ -819,6 +864,7 @@ export function recommendMasters(
   const analog = similarUsage(index, intent);
   const analogById = new Map(analog.variants.map((variant) => [variant.id, variant]));
   const tokens = analog.tokens.length ? analog.tokens : tokensOf(intent);
+  const nestedByScreen = mastersByScreen(index);
 
   type Scored = {
     node: GraphNode;
@@ -832,27 +878,52 @@ export function recommendMasters(
 
   const scored: Scored[] = [];
   for (const node of index.getNodesByType(...MASTER_TYPES)) {
-    const set =
-      node.type === "COMPONENT_SET"
-        ? node
-        : node.componentSetId
-          ? index.getNode(node.componentSetId)
-          : undefined;
-    const haystack = `${node.name} ${set?.name ?? ""} ${Object.values(node.variantProperties ?? {}).join(" ")}`;
-    const nameScore = overlap(haystack, tokens);
+    const set = setOf(index, node);
+    const nameHaystack = `${node.name} ${set?.name ?? ""}`;
+    const nameScore = overlap(nameHaystack, tokens);
+    const variantScore = overlap(variantHaystack(node), tokens);
     const analogHit = analogById.get(node.id);
-    if (nameScore === 0 && !analogHit) continue;
+    const screens = screensOfMaster(index, node);
+    let whereUsedScore = 0;
+    for (const screen of screens) whereUsedScore += overlap(screen.name, tokens);
+    let coOccur = 0;
+    for (const screen of screens) {
+      for (const sibling of nestedByScreen.get(screen.id) ?? []) {
+        if (sameFamily(node, sibling)) continue;
+        const siblingSet = setOf(index, sibling);
+        const haystack = `${sibling.name} ${siblingSet?.name ?? ""} ${variantHaystack(sibling)}`;
+        coOccur += overlap(haystack, tokens);
+      }
+    }
+
+    if (nameScore === 0 && variantScore === 0 && !analogHit && whereUsedScore === 0 && coOccur === 0) {
+      continue;
+    }
 
     const deprecated = node.status === "deprecated";
     const instances = computeComponentUsage(index, node).instanceCount;
+    const stale = instances === 0;
     const why: string[] = [];
     if (nameScore > 0) why.push("name");
+    if (variantScore > 0) why.push("variant");
     if (analogHit) why.push("similar-screen");
+    if (whereUsedScore > 0) why.push("where-used");
+    if (coOccur > 0) why.push("co-occur");
     if (instances > 0) why.push("usage");
+    if (stale) why.push("stale");
 
     const typeBoost = node.type === "COMPONENT_SET" ? 3 : node.type === "MAIN_COMPONENT" ? 2 : 1;
     const analogBoost = analogHit ? 50 + analogHit.count : 0;
-    let score = nameScore * 10 + analogBoost + Math.log1p(instances) + typeBoost;
+    const liveBoost = stale ? 0 : 18 + Math.log1p(instances) * 4;
+    let score =
+      nameScore * 8 +
+      variantScore * 16 +
+      analogBoost +
+      whereUsedScore * 14 +
+      Math.min(coOccur, 8) * 10 +
+      liveBoost +
+      typeBoost;
+    if (stale) score -= 24;
     if (deprecated) score -= 10_000;
 
     scored.push({
@@ -867,11 +938,21 @@ export function recommendMasters(
   }
 
   const analogIds = new Set(analogById.keys());
+  const analogSetIds = new Set(
+    [...analogById.values()]
+      .map((variant) => index.getNode(variant.id)?.componentSetId)
+      .filter((id): id is string => Boolean(id)),
+  );
   const setIds = new Set(
     scored.filter((entry) => entry.node.type === "COMPONENT_SET").map((entry) => entry.node.id),
   );
   const kept = scored.filter((entry) => {
-    if (entry.node.type !== "VARIANT" || analogIds.has(entry.node.id)) return true;
+    if (entry.node.type === "COMPONENT_SET" && analogSetIds.has(entry.node.id)) return false;
+    if (entry.node.type !== "VARIANT") return true;
+    if (analogIds.has(entry.node.id)) return true;
+    if (entry.why.includes("variant") || entry.why.includes("where-used") || entry.why.includes("co-occur")) {
+      return true;
+    }
     return !entry.node.componentSetId || !setIds.has(entry.node.componentSetId);
   });
 
@@ -892,9 +973,11 @@ export function recommendMasters(
     const slots = includeSlots ? slotsForComponent(index, entry.node) : [];
     const hint = entry.deprecated
       ? "Deprecated — do not place. Pick a live master from this list."
-      : entry.analog
-        ? `Place this figmaNodeId. Similar screens nest it${where ? ` (${where})` : ""}.`
-        : `Place this figmaNodeId in Figma.${where ? ` Used on ${where}.` : " No screens use it yet."}`;
+      : entry.instances === 0
+        ? "Live master, but unused in this file. Prefer a where-used candidate when one exists."
+        : entry.analog
+          ? `Place this figmaNodeId. Similar screens nest it${where ? ` (${where})` : ""}.`
+          : `Place this figmaNodeId in Figma.${where ? ` Used on ${where}.` : ""}`;
     return {
       id: entry.node.id,
       name: entry.node.name,

@@ -11,7 +11,23 @@ Designers still own the library. Agents get a short card with real `figmaNodeId`
 | **Designer** | Add or edit recipes in JSON. Optionally bind a slot to a master that already exists after ingest. |
 | **Agent** | `list_recipes` → `recipe "checkout summary"` → `recommend` any unbound slot → place those ids → `verify_frame`. Never Read `graph.json`. |
 
-Recipes do **not** create components. Empty slots stay unbound until `recommend` fills them from the ingested graph.
+Recipes do **not** create components. Never invent a Figma node id.
+
+## After ingest (binding)
+
+When a graph exists, **list** and **get** resolve each slot against live masters:
+
+| Slot status | Meaning |
+|-------------|---------|
+| **bound** | Overlay/starter `defaultMasterId` is still in the graph and not deprecated. Place that id. |
+| **filled** | No stored id (or it was skipped); `recommend` picked a live master. Place that id. |
+| **missing** | Stored id is not in the graph. Card includes `nextRecommend`. Do not invent a replacement id. |
+| **deprecated** | Stored master is deprecated. Card includes `nextRecommend` for a live stand-in. |
+| **unbound** | No live match. Card includes `nextRecommend`. Call `recommend` with that query. |
+
+`.graphify/recipes.json` **still wins** over the starter pack (same `id` replaces). Binding never writes invented ids into the overlay.
+
+You can list recipes with no graph. Slots stay `unbound` and each one still returns `nextRecommend`. Filling ids needs ingest first.
 
 ## Files
 
@@ -19,8 +35,6 @@ Recipes do **not** create components. Empty slots stay unbound until `recommend`
 |------|------|
 | [`src/data/recipes.json`](../src/data/recipes.json) | Starter pack shipped with Resolve (7 common screens). |
 | `.graphify/recipes.json` | Your overlay. Same shape. Matching `id` replaces a starter recipe; new ids append. |
-
-You do not need a graph file to *list* recipes. Filling slots with ids needs an ingest first.
 
 ## Add a recipe
 
@@ -63,4 +77,4 @@ npm run resolve -- recommend "checkout primary button"
 npm run resolve -- verify "Checkout Summary"
 ```
 
-MCP: `list_recipes`, `recipe` / `get_recipe` (query = id, title, or intent).
+MCP: `list_recipes`, `recipe` / `get_recipe` (query = id, title, or intent). After ingest, both bind slots to live masters.

@@ -44,11 +44,12 @@ function usage(): void {
       "      Re-run ingest to refresh the library before recommend / verify_frame.",
       "",
       "  resolve recipe [list | \"<name or intent>\"] [--id] [--intent \"<brief>\"]",
-      "      Screen packs. No arg / list: starter + .graphify/recipes.json overlay.",
-      "      Name or intent: slot card with figmaNodeIds. Unbound slots say what to recommend.",
+      "      Screen packs. Overlay .graphify/recipes.json still wins.",
+      "      After ingest, list/get bind slots to live masters (or next recommend query).",
+      "      Never invents node ids. Unbound: recommend then verify_frame.",
       "  resolve recommend \"<intent>\" [--id] [--budget <chars>]",
-      "      Ranked masters for a brief. figmaNodeId, variants, where-used. Deprecated demoted.",
-      "      Agent does not need the component name. Cap ~2000 chars. Do not Read graph.json.",
+      "      Ranked masters: name/intent, variant props, where-used, co-occurrence.",
+      "      Live over stale. Deprecated demoted. Cap ~2000 chars. Place returned ids only.",
       "  resolve resolve \"<name>\" [--id] [--budget <chars>]",
       "      Usage card: screens, slot fills, figmaNodeId. When you already know the name.",
       "  resolve verify \"<frame>\" [--id] [--components a,b] [--rules <file>]",
@@ -219,7 +220,7 @@ async function main(argv: string[]): Promise<void> {
       const query = positionals(args)[0];
       const recipes = loadRecipes();
       if (!query || query === "list") {
-        printJson(listRecipes(recipes));
+        printJson(listRecipes(recipes, resolveGraph(flag(args, "id"))?.index));
         return;
       }
       printJson(

@@ -156,22 +156,44 @@ export function mergeRecipes(base: Recipe[], overlay: Recipe[]): Recipe[] {
   return [...byId.values()];
 }
 
-export function listRecipes(recipes: Recipe[]) {
+function compactListSlot(slot: FilledSlot) {
+  const master = slot.master
+    ? {
+        id: slot.master.id,
+        name: slot.master.name,
+        figmaNodeId: slot.master.figmaNodeId,
+        deprecated: slot.master.deprecated,
+      }
+    : undefined;
+  const unbound =
+    slot.status === "unbound" || slot.status === "missing" || slot.status === "deprecated";
+  return {
+    role: slot.role,
+    required: slot.required,
+    status: slot.status,
+    ...(master ? { master } : {}),
+    ...(unbound ? { nextRecommend: slot.nextRecommend } : {}),
+  };
+}
+
+export function listRecipes(recipes: Recipe[], index?: GraphIndex) {
   const rows = [...recipes]
     .sort((a, b) => a.title.localeCompare(b.title) || a.id.localeCompare(b.id))
-    .map((recipe) => ({
-      id: recipe.id,
-      title: recipe.title,
-      intentAliases: recipe.intentAliases,
-      notes: recipe.notes,
-      slots: recipe.slots.map((slot) => ({
-        role: slot.role,
-        required: slot.required,
-      })),
-    }));
+    .map((recipe) => {
+      const filled = index ? fillRecipe(index, recipe) : unboundCard(recipe);
+      return {
+        id: recipe.id,
+        title: recipe.title,
+        intentAliases: recipe.intentAliases,
+        notes: recipe.notes,
+        slots: filled.slots.map(compactListSlot),
+      };
+    });
   return {
     recipes: rows,
-    hint: 'Call recipe "<id or intent>" for the pack card (figmaNodeIds + slots). Unbound: recommend. After draw: verify_frame. Do not Read graph.json.',
+    hint: index
+      ? 'Slots bound/filled from live masters. Overlay .graphify/recipes.json still wins. Unbound: recommend the nextRecommend query. After draw: verify_frame. Do not invent node ids. Do not Read graph.json.'
+      : 'Ingest a library, then list_recipes again to bind slots. Overlay .graphify/recipes.json still wins. Unbound: recommend. Do not invent node ids. Do not Read graph.json.',
   };
 }
 
