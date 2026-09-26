@@ -416,7 +416,15 @@ export function AtlasCanvas() {
   };
 
   if (!index || !atlas) {
-    return <div className="canvas-empty">Load a file to see its atlas.</div>;
+    return (
+      <div className="canvas-empty">
+        <div className="canvas-empty__card">
+          <p className="overview__kicker">Overview map</p>
+          <strong>No atlas yet</strong>
+          <span>Load a Figma file to see clusters, health, and next actions.</span>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -452,16 +460,24 @@ export function AtlasCanvas() {
       )}
 
       <div className="atlas__hud">
-        <span>
-          {atlas.projection.stats.nodes} nodes · {atlas.projection.stats.edges} edges ·{" "}
-          {atlas.communities.communities.length} communities
-        </span>
-        {atlas.projection.stats.collapsedInstances > 0 && (
-          <span className="atlas__hud-note">
-            {atlas.projection.stats.collapsedInstances} instances folded into their components
+        <div className="atlas__hud-stats">
+          <span>
+            <b>{atlas.projection.stats.nodes}</b> nodes
           </span>
-        )}
-        <span className="atlas__hud-note">Q {atlas.communities.modularity.toFixed(3)}</span>
+          <span>
+            <b>{atlas.projection.stats.edges}</b> edges
+          </span>
+          <span>
+            <b>{atlas.communities.communities.length}</b> clusters
+          </span>
+          {atlas.projection.stats.collapsedInstances > 0 && (
+            <span className="atlas__hud-note">
+              {atlas.projection.stats.collapsedInstances} instances folded
+            </span>
+          )}
+          <span className="atlas__hud-note">Q {atlas.communities.modularity.toFixed(3)}</span>
+        </div>
+        <p className="atlas__hud-hint">Drag to pan · scroll to zoom · double-click opens Explorer</p>
         <button type="button" onClick={() => { fit(); draw(); }}>
           Fit
         </button>

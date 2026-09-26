@@ -9,6 +9,8 @@ async function ready(page: Page) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Resolve" })).toBeVisible();
   await expect(page.getByText(/source: (figma-mcp|mock)/)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByLabel("Library counts")).toBeVisible();
   await expect(page.getByRole("searchbox", { name: "Search the graph" })).toBeVisible();
 }
 
@@ -33,6 +35,9 @@ test("Atlas and Explorer clicks update inspector", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Demo Pay — Product" })).toBeVisible();
 
   await expect(page.locator(".atlas__canvas")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Library overview" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Communities" })).toBeVisible();
+  await expect(page.locator(".community-card").first()).toBeVisible();
   await expect(page.locator(".atlas__progress")).toBeHidden({ timeout: 30_000 });
   await page.locator(".atlas__canvas").click({ position: { x: 200, y: 200 } });
 

@@ -24,6 +24,7 @@
   --edge-interaction: #c2703a;
 
   --accent: #5b9dff;
+  --ok: #3fbf9a;
   --warn: #ffb454;
   --danger: #ff6b6b;
 
@@ -31,7 +32,9 @@
   --minimap-mask: rgba(13, 16, 23, 0.78);
 
   --radius: 8px;
+  --radius-lg: 12px;
   --shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  --card-shadow: 0 1px 0 rgba(230, 235, 245, 0.04), 0 10px 24px rgba(0, 0, 0, 0.32);
   --font: ui-sans-serif, -apple-system, "Segoe UI", Inter, system-ui, sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 }

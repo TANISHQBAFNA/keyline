@@ -47,7 +47,9 @@ export function Inspector() {
   if (!index || !graph || !node) {
     return (
       <aside className="inspector">
-        <p className="panel__empty">Select a node to inspect it.</p>
+        <p className="panel__empty">
+          Select a cluster or node. Overview shows library health until you pick one.
+        </p>
       </aside>
     );
   }
