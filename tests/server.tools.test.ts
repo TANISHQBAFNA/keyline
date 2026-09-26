@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { TOOLS, callTool } from "@/server/tools";
@@ -61,5 +61,52 @@ describe("agent tools", () => {
     const bound = checkout?.slots.filter((slot) => slot.status === "filled" || slot.status === "bound");
     expect(bound?.length).toBeGreaterThan(0);
     expect(bound?.every((slot) => slot.master?.id && slot.master.figmaNodeId)).toBe(true);
+  });
+
+  it("recipe list binds an active context pack without inventing ids", () => {
+    writeFileSync(
+      join(process.env["GRAPHIFY_HOME"]!, "context-packs.json"),
+      JSON.stringify({
+        active: "storefront-checkout-summary",
+        packs: [
+          {
+            id: "storefront-checkout-summary",
+            product: { id: "storefront", name: "Storefront" },
+            domain: "checkout",
+            journey: { step: "summary", screenJob: "checkout summary" },
+            recipeIds: ["checkout-summary"],
+          },
+        ],
+      }),
+    );
+    const result = callTool("list_recipes", {}) as {
+      recipes: Array<{
+        id: string;
+        context?: { id: string; domain?: string };
+        slots: Array<{ master?: unknown; nextRecommend?: string }>;
+      }>;
+    };
+    const checkout = result.recipes.find((recipe) => recipe.id === "checkout-summary");
+    expect(checkout?.context?.id).toBe("storefront-checkout-summary");
+    expect(checkout?.context?.domain).toBe("checkout");
+    expect(checkout?.slots.every((slot) => !slot.master)).toBe(true);
+    expect(checkout?.slots[0]?.nextRecommend).toMatch(/storefront|checkout/i);
+  });
+
+  it("recommend accepts product/journey flags on the tool", () => {
+    saveGraph(graph);
+    const names = TOOLS.find((tool) => tool.name === "recommend")?.inputSchema as {
+      properties: Record<string, unknown>;
+    };
+    expect(names.properties).toHaveProperty("pack");
+    expect(names.properties).toHaveProperty("product");
+    expect(names.properties).toHaveProperty("journey");
+    const result = callTool("recommend", {
+      intent: "primary button",
+      product: "storefront",
+      journey: "checkout summary",
+      domain: "checkout",
+    }) as { candidates: Array<{ id: string }>; context?: { id: string } };
+    expect(Array.isArray(result.candidates)).toBe(true);
   });
 });

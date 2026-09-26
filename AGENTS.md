@@ -37,8 +37,8 @@ npm run resolve -- verify "Checkout Summary"
 | Step | When | Tool |
 |------|------|------|
 | 1. Ingest | No graph, or Figma library changed | `ingest '<url>'` |
-| 2. Recipe | Screen job matches a pack (checkout, sign-in, empty state, …) | `recipe list` then `recipe "<job>"` |
-| 3. Recommend | Slot is unbound / missing / deprecated | `recommend "<nextRecommend>"` |
+| 2. Context / recipe | Screen job matches a pack (checkout, sign-in, empty state, …). Optional `.graphify/context-packs.json` scopes product + journey | `recipe list` then `recipe "<job>"` |
+| 3. Recommend | Slot is unbound / missing / deprecated | `recommend "<nextRecommend>"` (optional `--pack` / `--product` / `--journey`) |
 | 4. Place | Drawing in Figma | returned `figmaNodeId`s **only** |
 | 5. Verify | After the draw | `verify_frame` on the frame or placed names |
 
@@ -52,7 +52,7 @@ MCP: `list_recipes` → `recipe` → `recommend` → Figma → `verify_frame`.
 - `get_design_context` / `use_figma` on a FRAME or SECTION until recipe/recommend/resolve returned that id.
 - Skip ingest when the library changed. Re-ingest is the refresh path.
 
-`.graphify/recipes.json` overlay still wins over the starter pack. Do not invent `defaultMasterId`s. See `docs/RECIPES.md`.
+`.graphify/recipes.json` overlay still wins over the starter pack. Optional `.graphify/context-packs.json` binds product + journey to recipes so recommend is not a generic name match. Do not invent `defaultMasterId`s or Figma node ids in packs. See `docs/RECIPES.md`.
 
 Prefer **resolve** over any `keyline` / `graphify` alias.
 

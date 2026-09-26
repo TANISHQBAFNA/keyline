@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — product + journey context packs
+
+Shared libraries need *this* product and *this* journey step, not a generic name match.
+
+- **Context packs** — designer JSON at `.graphify/context-packs.json` (template: `src/data/context-packs.example.json`). Fields: product, domain, journey step / screen job, audience, constraints, `recipeIds`, optional `libraryRules`. Never Figma node ids.
+- **Recipe bind** — `recipe` list/get apply the matching pack to slot fills and `nextRecommend`. Bind via `recipeIds`, recipe `contextPackId`, `--pack` / `--product` / `--journey`, or file `active`.
+- **Recommend** — CLI + MCP accept `pack` / `product` / `journey` / `domain` (or load the active pack) and rank that context on top of name/intent, variants, where-used, live over stale, deprecate demotion. Empty match still does not invent.
+- **verify_frame** — still invent / deprecated / unresolved. Pack `libraryRules` are a light hook, not a cross-product cousin report.
+- **Skill path** — ingest → (optional context pack / recipe) → recommend unbound → place returned ids only → verify_frame. See `docs/RECIPES.md`.
+
 ## Unreleased — agent-output (ranking, skill path, bound recipes)
 
 AI drafting from the library gets better picks and a forced happy path — not invented one-offs.

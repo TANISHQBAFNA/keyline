@@ -4,9 +4,12 @@ import { DesignGraphSchema, type DesignGraph } from "@/core/model";
 import {
   indexGraph,
   mergeRecipes,
+  parseContextPackFile,
   parseLibraryRules,
   parseRecipeFile,
   starterRecipes,
+  type ContextBind,
+  type ContextPackFile,
   type GraphIndex,
   type LibraryRules,
   type Recipe,
@@ -17,8 +20,8 @@ import {
  *
  *   .graphify/graph.json
  *
- * Optional designer files next to it: library-rules.json, recipes.json.
- * Nodes + edges (CONTAINS, INSTANCE_OF, NESTS, …). Agents call recipe /
+ * Optional designer files next to it: library-rules.json, recipes.json,
+ * context-packs.json. Nodes + edges (CONTAINS, INSTANCE_OF, NESTS, …). Agents call recipe /
  * recommend / resolve — they do not Read the graph file.
  */
 
@@ -58,6 +61,11 @@ export function recipesPath(): string {
   return join(storeRoot(), "recipes.json");
 }
 
+/** Product + journey context packs. Missing file = no extra ranking context. */
+export function contextPacksPath(): string {
+  return join(storeRoot(), "context-packs.json");
+}
+
 export function readRecipeOverlay(explicitPath?: string): Recipe[] {
   const path = explicitPath ?? (existsSync(recipesPath()) ? recipesPath() : undefined);
   if (!path) return [];
@@ -70,6 +78,40 @@ export function readRecipeOverlay(explicitPath?: string): Recipe[] {
 
 export function loadRecipes(explicitPath?: string): Recipe[] {
   return mergeRecipes(starterRecipes(), readRecipeOverlay(explicitPath));
+}
+
+export function readContextPacks(explicitPath?: string): ContextPackFile {
+  const path = explicitPath ?? (existsSync(contextPacksPath()) ? contextPacksPath() : undefined);
+  if (!path) return { packs: [] };
+  if (!existsSync(path)) {
+    throw new Error(`Context packs file not found: ${path}`);
+  }
+  const raw: unknown = JSON.parse(readFileSync(path, "utf8"));
+  return parseContextPackFile(raw);
+}
+
+export function loadContextBind(
+  args: {
+    pack?: string;
+    product?: string;
+    journey?: string;
+    domain?: string;
+    packsFile?: string;
+  } = {},
+): ContextBind {
+  const file = readContextPacks(args.packsFile);
+  const trim = (value?: string) => {
+    const next = value?.trim();
+    return next ? next : undefined;
+  };
+  return {
+    packs: file.packs,
+    active: file.active,
+    packId: trim(args.pack),
+    product: trim(args.product),
+    journey: trim(args.journey),
+    domain: trim(args.domain),
+  };
 }
 
 export function readLibraryRules(explicitPath?: string): LibraryRules | undefined {

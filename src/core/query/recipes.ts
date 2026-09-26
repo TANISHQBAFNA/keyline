@@ -8,6 +8,14 @@ import {
   withCost,
   type RecommendCandidate,
 } from "./agentSurface";
+import {
+  appliedContext,
+  contextPhrase,
+  packForRecipe,
+  type AppliedContext,
+  type ContextBind,
+  type ContextPack,
+} from "./contextPacks";
 
 /**
  * Screen recipes — named packs of library masters for a common screen job.
@@ -27,6 +35,7 @@ export interface Recipe {
   intentAliases: string[];
   slots: RecipeSlot[];
   notes?: string;
+  contextPackId?: string;
 }
 
 export type RecipeSlotStatus = "bound" | "filled" | "missing" | "deprecated" | "unbound";
@@ -57,6 +66,7 @@ export interface FilledRecipe {
   recipe: { id: string; title: string; notes?: string };
   slots: FilledSlot[];
   hint: string;
+  context?: AppliedContext;
 }
 
 const SlotSchema = z.object({
@@ -71,6 +81,7 @@ const RecipeSchema = z.object({
   title: z.string().trim().min(1),
   intentAliases: z.array(z.string()).optional(),
   notes: z.string().optional(),
+  contextPackId: z.string().trim().min(1).optional(),
   slots: z.array(SlotSchema).min(1),
 });
 
@@ -127,6 +138,7 @@ function parseOne(raw: unknown): Recipe[] {
       title: data.title,
       intentAliases: (data.intentAliases ?? []).map((alias) => alias.trim()).filter(Boolean),
       notes: data.notes,
+      contextPackId: data.contextPackId,
       slots: data.slots.map((slot) => ({
         role: slot.role,
         required: slot.required ?? true,
@@ -176,24 +188,27 @@ function compactListSlot(slot: FilledSlot) {
   };
 }
 
-export function listRecipes(recipes: Recipe[], index?: GraphIndex) {
+export function listRecipes(recipes: Recipe[], index?: GraphIndex, bind?: ContextBind) {
   const rows = [...recipes]
     .sort((a, b) => a.title.localeCompare(b.title) || a.id.localeCompare(b.id))
     .map((recipe) => {
-      const filled = index ? fillRecipe(index, recipe) : unboundCard(recipe);
+      const pack = bind ? packForRecipe(recipe, bind) : undefined;
+      const filled = index ? fillRecipe(index, recipe, undefined, pack) : unboundCard(recipe, undefined, pack);
+      const context = pack ? appliedContext(pack) : undefined;
       return {
         id: recipe.id,
         title: recipe.title,
         intentAliases: recipe.intentAliases,
         notes: recipe.notes,
+        ...(context ? { context } : {}),
         slots: filled.slots.map(compactListSlot),
       };
     });
   return {
     recipes: rows,
     hint: index
-      ? 'Slots bound/filled from live masters. Overlay .graphify/recipes.json still wins. Unbound: recommend the nextRecommend query. After draw: verify_frame. Do not invent node ids. Do not Read graph.json.'
-      : 'Ingest a library, then list_recipes again to bind slots. Overlay .graphify/recipes.json still wins. Unbound: recommend. Do not invent node ids. Do not Read graph.json.',
+      ? 'Slots bound/filled from live masters. Overlay .graphify/recipes.json still wins. Context packs (.graphify/context-packs.json) scope recommend. Unbound: recommend the nextRecommend query. After draw: verify_frame. Do not invent node ids. Do not Read graph.json.'
+      : 'Ingest a library, then list_recipes again to bind slots. Overlay .graphify/recipes.json still wins. Optional .graphify/context-packs.json scopes product + journey. Unbound: recommend. Do not invent node ids. Do not Read graph.json.',
   };
 }
 
@@ -228,8 +243,15 @@ export function matchRecipe(recipes: Recipe[], query: string): Recipe | undefine
   return best?.recipe;
 }
 
-export function slotRecommendIntent(recipe: Recipe, slot: RecipeSlot, extraIntent?: string): string {
-  return [extraIntent, recipe.title, slot.role, ...slot.hints].filter(Boolean).join(" ");
+export function slotRecommendIntent(
+  recipe: Recipe,
+  slot: RecipeSlot,
+  extraIntent?: string,
+  pack?: ContextPack,
+): string {
+  return [extraIntent, pack ? contextPhrase(pack) : undefined, recipe.title, slot.role, ...slot.hints]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function masterFromNode(index: GraphIndex, node: GraphNode, hint: string): RecipeMaster {
@@ -272,8 +294,9 @@ function fillSlot(
   recipe: Recipe,
   slot: RecipeSlot,
   extraIntent?: string,
+  pack?: ContextPack,
 ): FilledSlot {
-  const nextRecommend = slotRecommendIntent(recipe, slot, extraIntent);
+  const nextRecommend = slotRecommendIntent(recipe, slot, extraIntent, pack);
   const base = { role: slot.role, required: slot.required, hints: slot.hints, nextRecommend };
 
   if (slot.defaultMasterId) {
@@ -306,7 +329,7 @@ function fillSlot(
     };
   }
 
-  const ranked = recommendMasters(index, nextRecommend);
+  const ranked = recommendMasters(index, nextRecommend, pack ? { context: pack } : {});
   const live = ranked.candidates.filter((candidate) => !candidate.deprecated);
   const pick = live.find((candidate) => hintOverlap(candidate, slot.hints) > 0);
   if (!pick) {
@@ -326,16 +349,23 @@ function fillSlot(
   };
 }
 
-export function fillRecipe(index: GraphIndex, recipe: Recipe, extraIntent?: string): FilledRecipe {
-  const slots = recipe.slots.map((slot) => fillSlot(index, recipe, slot, extraIntent));
+export function fillRecipe(
+  index: GraphIndex,
+  recipe: Recipe,
+  extraIntent?: string,
+  pack?: ContextPack,
+): FilledRecipe {
+  const slots = recipe.slots.map((slot) => fillSlot(index, recipe, slot, extraIntent, pack));
   const next = slots
     .filter((slot) => slot.status === "unbound" || slot.status === "missing" || slot.status === "deprecated")
     .map((slot) => slot.nextRecommend)
     .filter((item): item is string => Boolean(item));
   const placed = slots.filter((slot) => slot.master?.figmaNodeId && slot.status !== "deprecated").length;
+  const context = pack ? appliedContext(pack) : undefined;
   return {
     recipe: { id: recipe.id, title: recipe.title, notes: recipe.notes },
     slots,
+    ...(context ? { context } : {}),
     hint:
       next.length > 0
         ? `Place ${placed} bound/filled figmaNodeId(s). Next: recommend "${next[0]}". Then verify_frame. Do not Read graph.json.`
@@ -343,9 +373,9 @@ export function fillRecipe(index: GraphIndex, recipe: Recipe, extraIntent?: stri
   };
 }
 
-function unboundCard(recipe: Recipe, extraIntent?: string): FilledRecipe {
+function unboundCard(recipe: Recipe, extraIntent?: string, pack?: ContextPack): FilledRecipe {
   const slots = recipe.slots.map((slot) => {
-    const nextRecommend = slotRecommendIntent(recipe, slot, extraIntent);
+    const nextRecommend = slotRecommendIntent(recipe, slot, extraIntent, pack);
     return {
       role: slot.role,
       required: slot.required,
@@ -355,9 +385,11 @@ function unboundCard(recipe: Recipe, extraIntent?: string): FilledRecipe {
       hint: `Ingest a library, then recipe "${recipe.id}" again — or call recommend "${nextRecommend}".`,
     };
   });
+  const context = pack ? appliedContext(pack) : undefined;
   return {
     recipe: { id: recipe.id, title: recipe.title, notes: recipe.notes },
     slots,
+    ...(context ? { context } : {}),
     hint: `No graph yet. Ingest first, then recipe "${recipe.id}" to fill slots from the library. Do not Read graph.json.`,
   };
 }
@@ -367,6 +399,7 @@ export function recipeCard(
   query: string,
   index?: GraphIndex,
   extraIntent?: string,
+  bind?: ContextBind,
 ) {
   const recipe = matchRecipe(recipes, query);
   if (!recipe) {
@@ -376,7 +409,8 @@ export function recipeCard(
       hint: "No recipe matched. Call list_recipes, or recommend with a free-text brief. Do not Read graph.json.",
     });
   }
-  const filled = index ? fillRecipe(index, recipe, extraIntent) : unboundCard(recipe, extraIntent);
+  const pack = bind ? packForRecipe(recipe, bind) : undefined;
+  const filled = index ? fillRecipe(index, recipe, extraIntent, pack) : unboundCard(recipe, extraIntent, pack);
   return withCost({
     found: true as const,
     query,

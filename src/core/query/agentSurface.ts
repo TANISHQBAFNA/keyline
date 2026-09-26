@@ -775,6 +775,17 @@ export interface LibraryRules {
   deny?: string[];
 }
 
+/** Product + journey context mixed into recommend ranking. No Figma node ids. */
+export interface RecommendContext {
+  id?: string;
+  product?: { id?: string; name?: string };
+  domain?: string;
+  journey?: { step?: string; screenJob?: string };
+  audience?: string;
+  constraints?: { density?: string; a11y?: string };
+  libraryRules?: LibraryRules;
+}
+
 export function parseLibraryRules(raw: unknown): LibraryRules {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
   const record = raw as Record<string, unknown>;
@@ -850,21 +861,51 @@ function screensOfMaster(index: GraphIndex, node: GraphNode): GraphNode[] {
   return [...seen.values()];
 }
 
+function contextTokenGroups(context?: RecommendContext) {
+  if (!context) return undefined;
+  return {
+    product: tokensOf([context.product?.id, context.product?.name].filter(Boolean).join(" ")),
+    domain: tokensOf(context.domain ?? ""),
+    journey: tokensOf([context.journey?.step, context.journey?.screenJob].filter(Boolean).join(" ")),
+  };
+}
+
+function appliedRecommendContext(context?: RecommendContext) {
+  if (!context?.id) return undefined;
+  const product = context.product?.name || context.product?.id;
+  const journey = context.journey?.screenJob || context.journey?.step;
+  return {
+    id: context.id,
+    ...(product ? { product } : {}),
+    ...(context.domain ? { domain: context.domain } : {}),
+    ...(journey ? { journey } : {}),
+  };
+}
+
+function deniedByRules(index: GraphIndex, node: GraphNode, rules?: LibraryRules): boolean {
+  const deny = rules?.deny;
+  if (!deny?.length) return false;
+  return deny.some((rule) => ruleMatches(index, node, rule));
+}
+
 /**
  * Brief/intent → ranked library masters. Agent does not need the component
  * name. Name/intent, variant props, where-used + sibling co-occurrence, live
- * over stale, deprecated demoted. Never invents a component that is not in the graph.
+ * over stale, deprecated demoted. Optional product/journey context boosts
+ * masters used on matching screens. Never invents a component that is not in the graph.
  */
 export function recommendMasters(
   index: GraphIndex,
   intent: string,
-  options: { budgetChars?: number } = {},
+  options: { budgetChars?: number; context?: RecommendContext } = {},
 ) {
   const budgetChars = options.budgetChars ?? RECOMMEND_BUDGET;
   const analog = similarUsage(index, intent);
   const analogById = new Map(analog.variants.map((variant) => [variant.id, variant]));
   const tokens = analog.tokens.length ? analog.tokens : tokensOf(intent);
   const nestedByScreen = mastersByScreen(index);
+  const ctx = contextTokenGroups(options.context);
+  const packRules = options.context?.libraryRules;
 
   type Scored = {
     node: GraphNode;
@@ -878,6 +919,7 @@ export function recommendMasters(
 
   const scored: Scored[] = [];
   for (const node of index.getNodesByType(...MASTER_TYPES)) {
+    if (deniedByRules(index, node, packRules)) continue;
     const set = setOf(index, node);
     const nameHaystack = `${node.name} ${set?.name ?? ""}`;
     const nameScore = overlap(nameHaystack, tokens);
@@ -900,6 +942,20 @@ export function recommendMasters(
       continue;
     }
 
+    let productHit = 0;
+    let domainHit = 0;
+    let journeyHit = 0;
+    if (ctx) {
+      productHit = overlap(nameHaystack, ctx.product);
+      domainHit = overlap(nameHaystack, ctx.domain);
+      journeyHit = overlap(nameHaystack, ctx.journey);
+      for (const screen of screens) {
+        productHit += overlap(screen.name, ctx.product);
+        domainHit += overlap(screen.name, ctx.domain);
+        journeyHit += overlap(screen.name, ctx.journey);
+      }
+    }
+
     const deprecated = node.status === "deprecated";
     const instances = computeComponentUsage(index, node).instanceCount;
     const stale = instances === 0;
@@ -909,6 +965,9 @@ export function recommendMasters(
     if (analogHit) why.push("similar-screen");
     if (whereUsedScore > 0) why.push("where-used");
     if (coOccur > 0) why.push("co-occur");
+    if (productHit > 0) why.push("product");
+    if (domainHit > 0) why.push("domain");
+    if (journeyHit > 0) why.push("journey");
     if (instances > 0) why.push("usage");
     if (stale) why.push("stale");
 
@@ -921,6 +980,9 @@ export function recommendMasters(
       analogBoost +
       whereUsedScore * 14 +
       Math.min(coOccur, 8) * 10 +
+      productHit * 16 +
+      domainHit * 16 +
+      journeyHit * 18 +
       liveBoost +
       typeBoost;
     if (stale) score -= 24;
@@ -1002,12 +1064,14 @@ export function recommendMasters(
   let truncated = false;
   let candidates = kept.slice(0, limit).map((entry) => toCandidate(entry, includeSlots, whereLimit));
 
+  const applied = appliedRecommendContext(options.context);
   const payloadOf = () => ({
     intent,
     builtAt: index.graph.builtAt,
     candidates,
     similarScreens: analog.screens.slice(0, 4),
     truncated,
+    ...(applied ? { context: applied } : {}),
     hint:
       candidates.length === 0
         ? `No library master matched. Do not invent a component. ${REFRESH_HINT}`
@@ -1044,7 +1108,7 @@ export interface VerifyHit {
  */
 export function verifyFrame(
   index: GraphIndex,
-  input: { frame?: string; components?: string[]; rules?: LibraryRules } = {},
+  input: { frame?: string; components?: string[]; rules?: LibraryRules; context?: RecommendContext } = {},
 ) {
   const invents: VerifyHit[] = [];
   const deprecatedHits: VerifyHit[] = [];
@@ -1054,8 +1118,15 @@ export function verifyFrame(
   const seenDeprecated = new Set<string>();
   const seenUnresolved = new Set<string>();
 
-  const allow = input.rules?.allow?.filter((item) => item.trim().length > 0);
-  const deny = input.rules?.deny?.filter((item) => item.trim().length > 0);
+  const mergedRules: LibraryRules = {
+    allow: input.rules?.allow ?? input.context?.libraryRules?.allow,
+    deny: [
+      ...(input.rules?.deny ?? []),
+      ...(input.context?.libraryRules?.deny ?? []),
+    ].filter((item, pos, list) => item.trim().length > 0 && list.indexOf(item) === pos),
+  };
+  const allow = mergedRules.allow?.filter((item) => item.trim().length > 0);
+  const deny = mergedRules.deny?.filter((item) => item.trim().length > 0);
   const allowList = allow?.length ? allow : undefined;
   const denyList = deny?.length ? deny : undefined;
 

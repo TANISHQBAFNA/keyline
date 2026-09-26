@@ -9,8 +9,8 @@ Before any Figma screen build, `use_figma`, `get_design_context`, or design-from
 
 1. Prefer **resolve** over keyline / graphify aliases.
 2. Ingest (refresh if the library changed): `npm run resolve -- ingest '<url>'`.
-3. If the screen job matches a pack: `npm run resolve -- recipe list` then `recipe "<job>"`.
-4. Unbound slots: `npm run resolve -- recommend "<intent>"`. Place returned `figmaNodeId`s only.
+3. If the screen job matches a pack: `npm run resolve -- recipe list` then `recipe "<job>"`. Optional `.graphify/context-packs.json` scopes product + journey.
+4. Unbound slots: `npm run resolve -- recommend "<intent>"` (optional `--pack` / `--product` / `--journey`). Place returned `figmaNodeId`s only.
 5. After drawing: `npm run resolve -- verify "<frame>"` (or `--components a,b`).
 
 **Never** invent components. **Never** Read `.graphify/graph.json` or dump the graph.

@@ -16,6 +16,7 @@ import {
   componentUsageCard,
   explainNode,
   listRecipes,
+  packForRecommend,
   pathBetween,
   queryQuestion,
   recipeCard,
@@ -23,7 +24,7 @@ import {
   toGraphReportMarkdown,
   verifyFrame,
 } from "@/core/query";
-import { deleteGraph, graphIdFor, graphPath, listGraphs, loadRecipes, readLibraryRules, rebuildIndex, resolveGraph, saveGraph, storeRoot } from "./store";
+import { deleteGraph, graphIdFor, graphPath, listGraphs, loadContextBind, loadRecipes, readLibraryRules, rebuildIndex, resolveGraph, saveGraph, storeRoot } from "./store";
 
 /**
  * Resolve CLI — ingest once into `.graphify/graph.json`.
@@ -43,18 +44,20 @@ function usage(): void {
       "      Token from FIGMA_ACCESS_TOKEN. Writes .graphify/graph.json — agents call resolve, do not Read that file.",
       "      Re-run ingest to refresh the library before recommend / verify_frame.",
       "",
-      "  resolve recipe [list | \"<name or intent>\"] [--id] [--intent \"<brief>\"]",
+      "  resolve recipe [list | \"<name or intent>\"] [--id] [--intent \"<brief>\"] [--pack <id>] [--product <name>] [--journey <step>] [--domain <domain>]",
       "      Screen packs. Overlay .graphify/recipes.json still wins.",
       "      After ingest, list/get bind slots to live masters (or next recommend query).",
+      "      Matching .graphify/context-packs.json scopes slot fills + nextRecommend.",
       "      Never invents node ids. Unbound: recommend then verify_frame.",
-      "  resolve recommend \"<intent>\" [--id] [--budget <chars>]",
+      "  resolve recommend \"<intent>\" [--id] [--budget <chars>] [--pack <id>] [--product <name>] [--journey <step>] [--domain <domain>]",
       "      Ranked masters: name/intent, variant props, where-used, co-occurrence.",
-      "      Live over stale. Deprecated demoted. Cap ~2000 chars. Place returned ids only.",
+      "      Product/journey context on top. Live over stale. Deprecated demoted. Cap ~2000 chars. Place returned ids only.",
       "  resolve resolve \"<name>\" [--id] [--budget <chars>]",
       "      Usage card: screens, slot fills, figmaNodeId. When you already know the name.",
-      "  resolve verify \"<frame>\" [--id] [--components a,b] [--rules <file>]",
+      "  resolve verify \"<frame>\" [--id] [--components a,b] [--rules <file>] [--pack <id>]",
       "      After drawing: pass/fail, invents, deprecated, unresolved. Measures invent rate.",
       "      Optional .graphify/library-rules.json { allow, deny }. Else in-graph + not deprecated = approved.",
+      "      Pack libraryRules are a light hook — not a cross-product cousin report.",
       "  resolve orient [--id <graphId>]     Optional god-node summary. Prefer recommend / resolve.",
       "  resolve query \"<question>\" [--id] [--budget <chars>]",
       "      Optional scoped subgraph. Agents should recommend or resolve a component instead.",
@@ -186,6 +189,16 @@ function positionals(args: string[]): string[] {
   return out;
 }
 
+function bindFromFlags(args: string[]) {
+  return loadContextBind({
+    pack: flag(args, "pack"),
+    product: flag(args, "product"),
+    journey: flag(args, "journey"),
+    domain: flag(args, "domain"),
+    packsFile: flag(args, "packs"),
+  });
+}
+
 function printJson(value: unknown): void {
   process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
@@ -219,12 +232,13 @@ async function main(argv: string[]): Promise<void> {
     case "recipes": {
       const query = positionals(args)[0];
       const recipes = loadRecipes();
+      const bind = bindFromFlags(args);
       if (!query || query === "list") {
-        printJson(listRecipes(recipes, resolveGraph(flag(args, "id"))?.index));
+        printJson(listRecipes(recipes, resolveGraph(flag(args, "id"))?.index, bind));
         return;
       }
       printJson(
-        recipeCard(recipes, query, resolveGraph(flag(args, "id"))?.index, flag(args, "intent")),
+        recipeCard(recipes, query, resolveGraph(flag(args, "id"))?.index, flag(args, "intent"), bind),
       );
       return;
     }
@@ -236,6 +250,7 @@ async function main(argv: string[]): Promise<void> {
       printJson(
         recommendMasters(requireGraph(args).index, intent, {
           budgetChars: Number.isFinite(budget) && budget > 0 ? budget : undefined,
+          context: packForRecommend(bindFromFlags(args)),
         }),
       );
       return;
@@ -314,6 +329,7 @@ async function main(argv: string[]): Promise<void> {
           frame,
           components,
           rules: readLibraryRules(rulesPath),
+          context: packForRecommend(bindFromFlags(args)),
         }),
       );
       return;

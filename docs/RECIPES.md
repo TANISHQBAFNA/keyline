@@ -8,7 +8,7 @@ Designers still own the library. Agents get a short card with real `figmaNodeId`
 
 | You | You do |
 |-----|--------|
-| **Designer** | Add or edit recipes in JSON. Optionally bind a slot to a master that already exists after ingest. |
+| **Designer** | Add or edit recipes in JSON. Optionally bind a slot to a master that already exists after ingest. Drop a product+journey pack in `.graphify/context-packs.json` and bind it with `recipeIds`. |
 | **Agent** | `list_recipes` → `recipe "checkout summary"` → `recommend` any unbound slot → place those ids → `verify_frame`. Never Read `graph.json`. |
 
 Recipes do **not** create components. Never invent a Figma node id.
@@ -27,6 +27,8 @@ When a graph exists, **list** and **get** resolve each slot against live masters
 
 `.graphify/recipes.json` **still wins** over the starter pack (same `id` replaces). Binding never writes invented ids into the overlay.
 
+A matching **context pack** (product + journey) is mixed into slot fills and `nextRecommend` so ranking is for *this* product and *this* step, not a generic name match. See [Context packs](#context-packs).
+
 You can list recipes with no graph. Slots stay `unbound` and each one still returns `nextRecommend`. Filling ids needs ingest first.
 
 ## Files
@@ -35,6 +37,8 @@ You can list recipes with no graph. Slots stay `unbound` and each one still retu
 |------|------|
 | [`src/data/recipes.json`](../src/data/recipes.json) | Starter pack shipped with Resolve (7 common screens). |
 | `.graphify/recipes.json` | Your overlay. Same shape. Matching `id` replaces a starter recipe; new ids append. |
+| [`.graphify/context-packs.json`](#context-packs) | Product + journey context. Bind to recipes via `recipeIds` or `contextPackId`. |
+| [`src/data/context-packs.example.json`](../src/data/context-packs.example.json) | Copy-paste template. Not loaded until you drop it in `.graphify/`. |
 
 ## Add a recipe
 
@@ -65,6 +69,41 @@ You can list recipes with no graph. Slots stay `unbound` and each one still retu
 
 To replace a starter recipe, reuse its `id` (for example `checkout-summary`) in your overlay.
 
+Optional: bind a context pack from the recipe side with `"contextPackId": "storefront-checkout-summary"`. Prefer listing `recipeIds` on the pack so one product/journey file owns the bind.
+
+## Context packs
+
+Designers that share one Figma library across products add a **product + journey** pack so `recipe` / `recommend` pick masters for *this* product and *this* step — not a generic name match.
+
+Copy [`src/data/context-packs.example.json`](../src/data/context-packs.example.json) to `.graphify/context-packs.json` (or write a smaller file). Human-editable. **Never add Figma node ids.**
+
+```json
+{
+  "version": 1,
+  "active": "storefront-checkout-summary",
+  "packs": [
+    {
+      "id": "storefront-checkout-summary",
+      "product": { "id": "storefront", "name": "Storefront" },
+      "domain": "checkout",
+      "journey": { "step": "summary", "screenJob": "checkout summary" },
+      "audience": "returning shopper",
+      "constraints": { "density": "compact", "a11y": "wcag-aa" },
+      "recipeIds": ["checkout-summary"],
+      "libraryRules": { "deny": ["Banner"] }
+    }
+  ]
+}
+```
+
+`product` and `journey` also accept a string (`"Storefront"`, `"summary"`). `libraryRules` is the same `{ allow, deny }` shape as `.graphify/library-rules.json`.
+
+**Bind order** (first hit wins): `--pack` / MCP `pack` → recipe `contextPackId` → pack `recipeIds` → `--product` / `--journey` / `--domain` → file `active` (if that pack lists this recipe, or lists none).
+
+`recommend` uses the same pack (or the active pack, or inline product/journey flags) **on top of** existing ranking: name/intent, variants, where-used, live over stale, deprecate demotion. Empty match still means do not invent.
+
+`verify_frame` stays invent / deprecated / unresolved. Pack `libraryRules` can deny a master; this is not a cross-product "wrong cousin" report.
+
 ## Try it
 
 ```bash
@@ -73,8 +112,9 @@ npm run resolve -- ingest '<figma-url>'
 npm run resolve -- recipe list
 npm run resolve -- recipe "checkout summary"
 npm run resolve -- recommend "checkout primary button"
+npm run resolve -- recommend "primary button" --pack storefront-checkout-summary
 # draw with returned figmaNodeIds
 npm run resolve -- verify "Checkout Summary"
 ```
 
-MCP: `list_recipes`, `recipe` / `get_recipe` (query = id, title, or intent). After ingest, both bind slots to live masters.
+MCP: `list_recipes`, `recipe` / `get_recipe` (query = id, title, or intent), `recommend` (optional `pack` / `product` / `journey` / `domain`). After ingest, recipe slots bind to live masters. Context packs scope those fills.
