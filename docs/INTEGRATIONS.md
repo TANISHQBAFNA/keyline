@@ -27,13 +27,19 @@ graph model, the query layer or the UI.
 Parsing was already in `adaptFigmaRestFile`. Live fetch is
 `FigmaRestIngestionSource` / `fetchFigmaRestDocument`.
 
-**Agent path (preferred).** Ingest once into `.graphify/graph.json`. Optional `recipe` for a screen pack, then `recommend` unbound slots, then Figma on those `figmaNodeId`s, then `verify_frame`. Do not Read the graph file. Re-run ingest to refresh.
+**Agent path (preferred).** Ingest each linked Figma file into one workspace — not one giant `graph.json`. Shared design system: `--role library`. Product and client files next (`--role product` / `--role client`). That writes `.graphify/workspace.json` and `.graphify/files/<key>.json`. Optional `recipe` for a screen pack, then `recommend` unbound slots, then Figma on those `figmaNodeId`s (cards also stamp `fileKey`; ids collide across files), then `verify_frame`. When a library file and a product/client file are linked, `cousins` / `check_cousins` flags wrong-cousin drift. `workspace` lists linked files. Do not Read graph.json. Re-run ingest for a file to refresh.
+
+Designer walkthrough: [GUIDE.md](GUIDE.md).
 
 ```bash
 export FIGMA_ACCESS_TOKEN=figd_…
 npm run build:server
-npm run resolve -- ingest 'https://www.figma.com/design/<fileKey>/<name>?node-id=1-2'
+npm run resolve -- ingest 'https://www.figma.com/design/<fileKey>/<name>?node-id=1-2' --role library --label "Shared DS"
+npm run resolve -- ingest 'https://www.figma.com/design/<productKey>/<name>?node-id=1-2' --role product --label "Storefront"
+npm run resolve -- workspace
 ```
+
+Roles are `library` | `product` | `client`. First ingest with no `--role` is the library; later files default to product. An unknown `--role` fails (no silent fallback). Or copy `src/data/workspace.example.json` to `.graphify/workspace.json` and ingest each row.
 
 Paste the shared screen/frame/section URL. `node-id` is the ingest scope. No `node-id`: each top-level screen, one request at a time. `--scope file` dumps the whole tree.
 
@@ -41,7 +47,7 @@ Paste the shared screen/frame/section URL. `node-id` is the ingest scope. No `no
 `sessionStorage`. Vite proxies `/api/figma` → `https://api.figma.com` so the
 browser can call REST at all.
 
-**Tokens.** Never commit a PAT. Never write it into `graph.json`. CLI reads
+**Tokens.** Never commit a PAT. Never write it into the store. CLI reads
 `FIGMA_ACCESS_TOKEN` (or `FIGMA_TOKEN`). UI never puts the token in the bundle.
 
 **Scope.** Shared links hit `GET /v1/files/:key/nodes?ids=`. Whole-file ingest
@@ -153,10 +159,12 @@ traverse it instead of re-reading the file. Each tool is a thin wrapper over
 | Tool | Implementation |
 |---|---|
 | `list_recipes()` | starter pack + `.graphify/recipes.json` overlay |
-| `recipe(query)` / `get_recipe` | `recipeCard` — slots with `figmaNodeId`s, unbound → recommend query |
-| `recommend(intent)` | `recommendMasters(index, intent)` — ranked library masters, deprecated demoted |
+| `recipe(query)` / `get_recipe` | `recipeCard` — slots with `fileKey` + `figmaNodeId`, unbound → recommend query |
+| `recommend(intent)` | `recommendMasters(index, intent)` — ranked library masters, deprecated demoted. Prefers library-role files when the workspace has one. |
 | `resolve(name)` | `componentUsageCard(index, name)` — usage card when the name is known |
-| `verify_frame(frame\|components)` | `verifyFrame(index, …)` — invents / deprecated / unresolved |
+| `verify_frame(frame\|components)` | `verifyFrame(index, …)` — invents / deprecated / unresolved. Cards stamp `fileKey` + `figmaNodeId` when known. |
+| `check_cousins(frame\|job)` | `checkCousins` — wrong-cousin report. Needs a library-role file in `.graphify/workspace.json`. |
+| `list_graphs()` | Linked workspace files (`library` / `product` / `client`) |
 | `check_frame(intent)` | `checkFrame(index, intent)` — analog variant on similar screens |
 | `find_nodes(query)` | `searchNodes(index, query)` — the same query language as the UI |
 | `get_node(id)` | `index.getNode(id)` + `usageSummaryFor` |

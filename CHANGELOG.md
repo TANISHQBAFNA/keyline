@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Michigan UAT Ready-with-minor
+
+Low defects after bet B. No new product bets.
+
+- **Docs** — [INTEGRATIONS.md](docs/INTEGRATIONS.md) matches the multi-file workspace (`ingest --role`, `.graphify/workspace.json`, `workspace`, `cousins` / `check_cousins`). Designers still start at [GUIDE.md](docs/GUIDE.md).
+- **verify_frame** — result cards stamp `fileKey` next to `figmaNodeId` when the graph or workspace knows the file (frame, invents, deprecated, unresolved).
+- **ingest --role** — unknown roles fail with a clear error and a non-zero exit. Valid: `library` | `product` | `client`. No silent fallback.
+
 ## Unreleased — multi-file workspace + wrong-cousin report
 
 One shared design system is the system of record. Resolve holds one knowledge workspace, not one giant Figma file.

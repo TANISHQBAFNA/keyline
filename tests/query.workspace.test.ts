@@ -4,10 +4,12 @@ import {
   indexGraph,
   isLibraryFileKey,
   mergeWorkspaceGraphs,
+  parseIngestRole,
   parseWorkspaceFile,
   recommendMasters,
   stampFileKey,
   upsertWorkspaceFile,
+  verifyFrame,
 } from "@/core/query";
 import exampleWorkspace from "@/data/workspace.example.json";
 
@@ -211,6 +213,16 @@ describe("workspace load", () => {
     expect(parseWorkspaceFile({})).toEqual({ version: 1, files: [] });
     expect(parseWorkspaceFile(null)).toEqual({ version: 1, files: [] });
   });
+
+  it("parseIngestRole accepts library | product | client and throws on junk", () => {
+    expect(parseIngestRole(undefined)).toBeUndefined();
+    expect(parseIngestRole("library")).toBe("library");
+    expect(parseIngestRole("PRODUCT")).toBe("product");
+    expect(parseIngestRole(" client ")).toBe("client");
+    expect(() => parseIngestRole("junk")).toThrow(/Unknown --role "junk"/);
+    expect(() => parseIngestRole("junk")).toThrow(/library, product, client/);
+    expect(() => parseIngestRole("")).toThrow(/Unknown --role/);
+  });
 });
 
 describe("provenance stamps", () => {
@@ -305,5 +317,32 @@ describe("recommend prefers the DS library", () => {
       workspace: { version: 1, files: [{ role: "product", key: "PROD", label: "Storefront" }] },
     });
     expect(result.candidates.every((row) => !row.why.includes("library"))).toBe(true);
+  });
+});
+
+describe("verify_frame stamps fileKey from the workspace", () => {
+  it("puts fileKey next to figmaNodeId on the frame and on placed masters", () => {
+    const lib = libraryGraph();
+    const prod = productGraph();
+    const merged = mergeWorkspaceGraphs(
+      [
+        { graph: lib.graph, role: "library" },
+        { graph: prod.graph, role: "product" },
+      ],
+      workspace,
+    );
+    const index = indexGraph(merged);
+    const result = verifyFrame(index, { frame: "Checkout Summary" });
+    expect(result.frame?.figmaNodeId).toBe("2:1");
+    expect(result.frame?.fileKey).toBe("PROD");
+    expect(result.pass).toBe(true);
+
+    const denied = verifyFrame(index, {
+      components: ["One-off Pay Button"],
+      rules: { deny: ["One-off Pay Button"] },
+    });
+    expect(denied.invents[0]?.figmaNodeId).toBe("8:8");
+    expect(denied.invents[0]?.fileKey).toBe("PROD");
+    expect(denied.invents[0]?.reason).toBe("denied");
   });
 });

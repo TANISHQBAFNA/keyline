@@ -22,9 +22,11 @@ import {
   recipeCard,
   checkCousins,
   describeRole,
+  parseIngestRole,
   recommendMasters,
   toGraphReportMarkdown,
   verifyFrame,
+  WORKSPACE_FILE_ROLES,
   type WorkspaceFileRole,
 } from "@/core/query";
 import {
@@ -43,9 +45,10 @@ import {
 } from "./store";
 
 /**
- * Resolve CLI — ingest once into `.graphify/graph.json`.
+ * Resolve CLI — ingest each linked file into the workspace
+ * (`.graphify/workspace.json` + `.graphify/files/`).
  *
- * Agents call resolve (usage card), then Figma. Do not Read the graph file.
+ * Agents call resolve / cousins (usage cards), then Figma. Do not Read graph.json.
  */
 
 /** Same flags `bindFromFlags` reads — keep help + usage errors in lockstep. */
@@ -142,9 +145,13 @@ function toGraph(payload: unknown, args: string[]): DesignGraph {
 }
 
 function ingestRole(args: string[]): WorkspaceFileRole | undefined {
-  const named = flag(args, "role");
-  if (named === "library" || named === "product" || named === "client") return named;
-  return undefined;
+  const at = args.indexOf("--role");
+  if (at < 0) return undefined;
+  const named = args[at + 1];
+  if (!named || named.startsWith("--")) {
+    throw new Error(`Unknown --role. Valid roles: ${WORKSPACE_FILE_ROLES.join(", ")}.`);
+  }
+  return parseIngestRole(named);
 }
 
 function writeStored(graph: DesignGraph, args: string[], target?: string): void {
@@ -236,11 +243,12 @@ function printJson(value: unknown): void {
   process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
 
-async function main(argv: string[]): Promise<void> {
+export async function runCli(argv: string[]): Promise<void> {
   const [command, ...args] = argv;
 
   switch (command) {
     case "ingest": {
+      ingestRole(args);
       const target = args.find((arg) => !arg.startsWith("--"));
       if (!target) throw new Error("Give a JSON file, Figma URL, or file key.");
 
@@ -459,7 +467,9 @@ async function main(argv: string[]): Promise<void> {
   }
 }
 
-main(process.argv.slice(2)).catch((error) => {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-  process.exit(1);
-});
+if (!process.env["VITEST"]) {
+  runCli(process.argv.slice(2)).catch((error) => {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.exit(1);
+  });
+}
