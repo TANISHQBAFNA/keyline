@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — designer guide
+
+Plain-language how-to for designers and product people: [`docs/GUIDE.md`](docs/GUIDE.md). README points there first. Context-pack example `howToAdd` clarified. Technical pages keep a one-line pointer.
+
 ## Unreleased — product + journey context packs
 
 Shared libraries need *this* product and *this* journey step, not a generic name match.

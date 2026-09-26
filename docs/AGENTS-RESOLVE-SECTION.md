@@ -1,5 +1,7 @@
 ## Resolve — forced path (copy this)
 
+Building Resolve? See this file. Using Resolve as a designer? Start at [GUIDE.md](GUIDE.md).
+
 Use Resolve before any Figma screen build or design-from-brief work. **Never Read `graph.json`.** Never invent components.
 
 Tagline: **Figma rules. Agents resolve.**

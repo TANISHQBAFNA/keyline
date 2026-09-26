@@ -1,5 +1,7 @@
 # Cursor + Resolve — how-to
 
+Building Resolve? See this file. Using Resolve as a designer? Start at [GUIDE.md](GUIDE.md).
+
 Everyday flow for using Resolve inside Cursor when building Figma screens from a brief.
 
 Tagline: **Figma rules. Agents resolve.**
