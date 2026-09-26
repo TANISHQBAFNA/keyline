@@ -8,10 +8,11 @@ alwaysApply: true
 Before any Figma screen build, `use_figma`, `get_design_context`, or design-from-brief work, do this in order:
 
 1. Prefer **resolve** over keyline / graphify aliases.
-2. Ingest (refresh if the library changed): `npm run resolve -- ingest '<url>'`.
+2. Ingest each linked file (`--role library|product|client`). Refresh if that file changed.
 3. If the screen job matches a pack: `npm run resolve -- recipe list` then `recipe "<job>"`. Optional `.graphify/context-packs.json` scopes product + journey + domain. Optional `--pack` / `--product` / `--journey` / `--domain`.
-4. Unbound slots: `npm run resolve -- recommend "<intent>"` (optional `--pack` / `--product` / `--journey` / `--domain`). Place returned `figmaNodeId`s only.
+4. Unbound slots: `npm run resolve -- recommend "<intent>"` (optional `--pack` / `--product` / `--journey` / `--domain`). Place returned `figmaNodeId`s only (cards stamp `fileKey`).
 5. After drawing: `npm run resolve -- verify "<frame>"` (or `--components a,b`; same optional `--pack` / `--product` / `--journey` / `--domain`).
+6. Multi-file workspace: `npm run resolve -- cousins "<frame>"` (`check_cousins`). Unsure means do not invent.
 
 **Never** invent components. **Never** Read `.graphify/graph.json` or dump the graph.
 
@@ -19,8 +20,9 @@ Caps: Level-1 default; Level-2 only for blast radius; whole-file only if asked.
 
 ```bash
 npm run build:server
-npm run resolve -- ingest '<url>'
+npm run resolve -- ingest '<url>' --role library
 npm run resolve -- recipe "checkout summary"
 npm run resolve -- recommend "checkout with primary button"
 npm run resolve -- verify "Checkout"
+npm run resolve -- cousins "Checkout"
 ```

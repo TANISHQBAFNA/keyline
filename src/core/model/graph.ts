@@ -15,6 +15,8 @@ export const GraphNodeSchema = z.object({
   id: z.string().min(1),
   /** Raw Figma id (`1:23`, style key, variable id) when the entity came from Figma. */
   figmaNodeId: z.string().optional(),
+  /** Figma file key. Required on cards once more than one file is in the workspace — node ids collide across files. */
+  fileKey: z.string().optional(),
   type: NodeTypeSchema,
   name: z.string(),
   description: z.string().optional(),

@@ -16,6 +16,7 @@ import {
   type ContextBind,
   type ContextPack,
 } from "./contextPacks";
+import type { WorkspaceManifest } from "./workspace";
 
 /**
  * Screen recipes — named packs of library masters for a common screen job.
@@ -45,6 +46,7 @@ export interface RecipeMaster {
   name: string;
   type: string;
   figmaNodeId?: string;
+  fileKey?: string;
   variantProperties?: Record<string, string>;
   set?: string;
   status?: GraphNode["status"];
@@ -174,6 +176,7 @@ function compactListSlot(slot: FilledSlot) {
         id: slot.master.id,
         name: slot.master.name,
         figmaNodeId: slot.master.figmaNodeId,
+        ...(slot.master.fileKey ? { fileKey: slot.master.fileKey } : {}),
         deprecated: slot.master.deprecated,
       }
     : undefined;
@@ -193,7 +196,9 @@ export function listRecipes(recipes: Recipe[], index?: GraphIndex, bind?: Contex
     .sort((a, b) => a.title.localeCompare(b.title) || a.id.localeCompare(b.id))
     .map((recipe) => {
       const pack = bind ? packForRecipe(recipe, bind) : undefined;
-      const filled = index ? fillRecipe(index, recipe, undefined, pack) : unboundCard(recipe, undefined, pack);
+      const filled = index
+        ? fillRecipe(index, recipe, undefined, pack, bind?.workspace)
+        : unboundCard(recipe, undefined, pack);
       const context = pack ? appliedContext(pack) : undefined;
       return {
         id: recipe.id,
@@ -261,6 +266,7 @@ function masterFromNode(index: GraphIndex, node: GraphNode, hint: string): Recip
     name: node.name,
     type: node.type,
     figmaNodeId: node.figmaNodeId,
+    ...(node.fileKey || index.graph.fileKey ? { fileKey: node.fileKey ?? index.graph.fileKey } : {}),
     variantProperties: node.variantProperties,
     set: set && set.id !== node.id ? set.name : undefined,
     status: node.status,
@@ -275,6 +281,7 @@ function masterFromCandidate(candidate: RecommendCandidate): RecipeMaster {
     name: candidate.name,
     type: candidate.type,
     figmaNodeId: candidate.figmaNodeId,
+    ...(candidate.fileKey ? { fileKey: candidate.fileKey } : {}),
     variantProperties: candidate.variantProperties,
     set: candidate.set,
     status: candidate.status,
@@ -295,6 +302,7 @@ function fillSlot(
   slot: RecipeSlot,
   extraIntent?: string,
   pack?: ContextPack,
+  workspace?: WorkspaceManifest,
 ): FilledSlot {
   const nextRecommend = slotRecommendIntent(recipe, slot, extraIntent, pack);
   const base = { role: slot.role, required: slot.required, hints: slot.hints, nextRecommend };
@@ -329,7 +337,10 @@ function fillSlot(
     };
   }
 
-  const ranked = recommendMasters(index, nextRecommend, pack ? { context: pack } : {});
+  const ranked = recommendMasters(index, nextRecommend, {
+    ...(pack ? { context: pack } : {}),
+    ...(workspace ? { workspace } : {}),
+  });
   const live = ranked.candidates.filter((candidate) => !candidate.deprecated);
   const pick = live.find((candidate) => hintOverlap(candidate, slot.hints) > 0);
   if (!pick) {
@@ -354,8 +365,9 @@ export function fillRecipe(
   recipe: Recipe,
   extraIntent?: string,
   pack?: ContextPack,
+  workspace?: WorkspaceManifest,
 ): FilledRecipe {
-  const slots = recipe.slots.map((slot) => fillSlot(index, recipe, slot, extraIntent, pack));
+  const slots = recipe.slots.map((slot) => fillSlot(index, recipe, slot, extraIntent, pack, workspace));
   const next = slots
     .filter((slot) => slot.status === "unbound" || slot.status === "missing" || slot.status === "deprecated")
     .map((slot) => slot.nextRecommend)
@@ -410,7 +422,9 @@ export function recipeCard(
     });
   }
   const pack = bind ? packForRecipe(recipe, bind) : undefined;
-  const filled = index ? fillRecipe(index, recipe, extraIntent, pack) : unboundCard(recipe, extraIntent, pack);
+  const filled = index
+    ? fillRecipe(index, recipe, extraIntent, pack, bind?.workspace)
+    : unboundCard(recipe, extraIntent, pack);
   return withCost({
     found: true as const,
     query,

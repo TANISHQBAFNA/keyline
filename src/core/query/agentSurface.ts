@@ -5,6 +5,8 @@ import { detectCommunitiesForIndex } from "./communities";
 import type { GraphIndex } from "./GraphIndex";
 import { searchNodes } from "./search";
 import { extractSubgraph, levelForNode } from "./subgraph";
+import { isLibraryFileKey, type WorkspaceManifest } from "./workspace";
+import { nodeFileKey } from "./workspaceMerge";
 
 /**
  * Agent-facing graph surface. Graph stays on disk. Agents call resolve /
@@ -241,6 +243,7 @@ export function usageCardForComponent(
   const base = {
     component: {
       ...briefNode(node),
+      ...(nodeFileKey(node) ? { fileKey: nodeFileKey(node) } : {}),
       variantProperties: node.variantProperties,
       identity: node.metadata?.["identity"],
     },
@@ -779,10 +782,12 @@ export interface LibraryRules {
 export interface RecommendContext {
   id?: string;
   product?: { id?: string; name?: string };
+  client?: { id?: string; name?: string };
   domain?: string;
   journey?: { step?: string; screenJob?: string };
   audience?: string;
   constraints?: { density?: string; a11y?: string };
+  files?: string[];
   libraryRules?: LibraryRules;
 }
 
@@ -805,6 +810,7 @@ export interface RecommendCandidate {
   name: string;
   type: string;
   figmaNodeId?: string;
+  fileKey?: string;
   variantProperties?: Record<string, string>;
   set?: string;
   status?: GraphNode["status"];
@@ -865,6 +871,7 @@ function contextTokenGroups(context?: RecommendContext) {
   if (!context) return undefined;
   return {
     product: tokensOf([context.product?.id, context.product?.name].filter(Boolean).join(" ")),
+    client: tokensOf([context.client?.id, context.client?.name].filter(Boolean).join(" ")),
     domain: tokensOf(context.domain ?? ""),
     journey: tokensOf([context.journey?.step, context.journey?.screenJob].filter(Boolean).join(" ")),
   };
@@ -873,12 +880,15 @@ function contextTokenGroups(context?: RecommendContext) {
 function appliedRecommendContext(context?: RecommendContext) {
   if (!context?.id) return undefined;
   const product = context.product?.name || context.product?.id;
+  const client = context.client?.name || context.client?.id;
   const journey = context.journey?.screenJob || context.journey?.step;
   return {
     id: context.id,
     ...(product ? { product } : {}),
+    ...(client ? { client } : {}),
     ...(context.domain ? { domain: context.domain } : {}),
     ...(journey ? { journey } : {}),
+    ...(context.files?.length ? { files: context.files } : {}),
   };
 }
 
@@ -897,7 +907,7 @@ function deniedByRules(index: GraphIndex, node: GraphNode, rules?: LibraryRules)
 export function recommendMasters(
   index: GraphIndex,
   intent: string,
-  options: { budgetChars?: number; context?: RecommendContext } = {},
+  options: { budgetChars?: number; context?: RecommendContext; workspace?: WorkspaceManifest } = {},
 ) {
   const budgetChars = options.budgetChars ?? RECOMMEND_BUDGET;
   const analog = similarUsage(index, intent);
@@ -906,6 +916,8 @@ export function recommendMasters(
   const nestedByScreen = mastersByScreen(index);
   const ctx = contextTokenGroups(options.context);
   const packRules = options.context?.libraryRules;
+  const workspace = options.workspace;
+  const graphFileKey = index.graph.fileKey;
 
   type Scored = {
     node: GraphNode;
@@ -943,18 +955,22 @@ export function recommendMasters(
     }
 
     let productHit = 0;
+    let clientHit = 0;
     let domainHit = 0;
     let journeyHit = 0;
     if (ctx) {
       productHit = overlap(nameHaystack, ctx.product);
+      clientHit = overlap(nameHaystack, ctx.client);
       domainHit = overlap(nameHaystack, ctx.domain);
       journeyHit = overlap(nameHaystack, ctx.journey);
       for (const screen of screens) {
         productHit += overlap(screen.name, ctx.product);
+        clientHit += overlap(screen.name, ctx.client);
         domainHit += overlap(screen.name, ctx.domain);
         journeyHit += overlap(screen.name, ctx.journey);
       }
     }
+    const libraryHit = isLibraryFileKey(workspace, nodeFileKey(node, graphFileKey));
 
     const deprecated = node.status === "deprecated";
     const instances = computeComponentUsage(index, node).instanceCount;
@@ -966,8 +982,10 @@ export function recommendMasters(
     if (whereUsedScore > 0) why.push("where-used");
     if (coOccur > 0) why.push("co-occur");
     if (productHit > 0) why.push("product");
+    if (clientHit > 0) why.push("client");
     if (domainHit > 0) why.push("domain");
     if (journeyHit > 0) why.push("journey");
+    if (libraryHit) why.push("library");
     if (instances > 0) why.push("usage");
     if (stale) why.push("stale");
 
@@ -981,8 +999,10 @@ export function recommendMasters(
       whereUsedScore * 14 +
       Math.min(coOccur, 8) * 10 +
       productHit * 16 +
+      clientHit * 12 +
       domainHit * 16 +
       journeyHit * 18 +
+      (libraryHit ? 36 : 0) +
       liveBoost +
       typeBoost;
     if (stale) score -= 24;
@@ -1040,11 +1060,13 @@ export function recommendMasters(
         : entry.analog
           ? `Place this figmaNodeId. Similar screens nest it${where ? ` (${where})` : ""}.`
           : `Place this figmaNodeId in Figma.${where ? ` Used on ${where}.` : ""}`;
+    const fileKey = nodeFileKey(entry.node, graphFileKey);
     return {
       id: entry.node.id,
       name: entry.node.name,
       type: entry.node.type,
       figmaNodeId: entry.node.figmaNodeId,
+      ...(fileKey ? { fileKey } : {}),
       variantProperties: entry.node.variantProperties,
       set: entry.setName,
       status: entry.node.status,
@@ -1098,6 +1120,7 @@ export interface VerifyHit {
   name: string;
   id?: string;
   figmaNodeId?: string;
+  fileKey?: string;
   reason?: VerifyReason | UnresolvedReason;
   status?: GraphNode["status"];
 }
@@ -1152,16 +1175,23 @@ export function verifyFrame(
     return false;
   };
 
+  const fileOf = (node: GraphNode) => nodeFileKey(node, index.graph.fileKey);
+
   const considerMaster = (master: GraphNode, given: string) => {
     if (blockedByRules(master, given)) {
-      pushUnique(invents, seenInvent, { name: master.name, id: master.id, figmaNodeId: master.figmaNodeId, reason: "denied" }, `denied:${master.id}`);
+      pushUnique(
+        invents,
+        seenInvent,
+        { name: master.name, id: master.id, figmaNodeId: master.figmaNodeId, fileKey: fileOf(master), reason: "denied" },
+        `denied:${master.id}`,
+      );
       return;
     }
     if (master.status === "deprecated") {
       pushUnique(
         deprecatedHits,
         seenDeprecated,
-        { name: master.name, id: master.id, figmaNodeId: master.figmaNodeId, status: "deprecated" },
+        { name: master.name, id: master.id, figmaNodeId: master.figmaNodeId, fileKey: fileOf(master), status: "deprecated" },
         master.id,
       );
       return;
@@ -1210,7 +1240,7 @@ export function verifyFrame(
       pushUnique(
         invents,
         seenInvent,
-        { name: node.name, id: node.id, figmaNodeId: node.figmaNodeId, reason: "not-a-master" },
+        { name: node.name, id: node.id, figmaNodeId: node.figmaNodeId, fileKey: fileOf(node), reason: "not-a-master" },
         `invent:${node.id}`,
       );
       continue;

@@ -16,10 +16,10 @@ MIT licensed. Free to use.
 
 ## The loop (one glance)
 
-1. **You** set rules, screen packs, and (when one library serves several products) a context pack for *this* product and *this* journey step
-2. **Resolve** holds the map of your Figma library
+1. **You** set rules, screen packs, linked Figma files (shared library + product/client), and (when one library serves several products) a context pack for *this* product and *this* journey step
+2. **Resolve** holds one knowledge workspace — not one giant Figma file
 3. **AI** asks what to reuse (`recipe`, then `recommend`), then drafts from those masters
-4. **Resolve** checks the draft (`verify_frame`) so invented pieces are visible
+4. **Resolve** checks the draft (`verify_frame`) and, when more than one file is linked, the wrong-cousin report
 5. **You** judge taste
 
 Resolve is not “AI that designs.” It is **your rules, made easy for AI to follow** — without pasting the whole Figma file into chat.

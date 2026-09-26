@@ -41,6 +41,7 @@ export interface BuildAiContextOptions {
 export function compactNode(node: GraphNode, includeMetadata = false): GraphNode {
   const compact: GraphNode = { id: node.id, type: node.type, name: node.name };
   if (node.figmaNodeId) compact.figmaNodeId = node.figmaNodeId;
+  if (node.fileKey) compact.fileKey = node.fileKey;
   if (node.description) compact.description = node.description;
   if (node.parentId) compact.parentId = node.parentId;
   if (node.pageId) compact.pageId = node.pageId;

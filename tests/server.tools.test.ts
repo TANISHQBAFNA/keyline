@@ -26,6 +26,7 @@ describe("agent tools", () => {
     expect(names).toContain("verify_frame");
     expect(names).toContain("resolve");
     expect(names).toContain("check_frame");
+    expect(names).toContain("check_cousins");
   });
 
   it("exposes list_recipes and recipe next to recommend", () => {

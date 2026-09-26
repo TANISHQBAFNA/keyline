@@ -10,8 +10,11 @@ import {
   loadContextBind,
   loadGraph,
   readContextPacks,
+  readWorkspace,
   saveGraph,
+  saveIngestedFile,
   storeRoot,
+  workspacePath,
 } from "@/server/store";
 
 describe("store", () => {
@@ -71,5 +74,16 @@ describe("store", () => {
     const bind = loadContextBind();
     expect(bind.active).toBe("storefront-checkout-summary");
     expect(bind.packs).toHaveLength(1);
+    expect(bind.workspace).toBeUndefined();
+  });
+
+  it("saveIngestedFile writes workspace.json + per-file graph and stamps fileKey", () => {
+    const first = saveIngestedFile(graph, { role: "library", label: "Shared DS" });
+    expect(first.role).toBe("library");
+    expect(existsSync(workspacePath())).toBe(true);
+    expect(readWorkspace().files[0]).toMatchObject({ role: "library", key: graph.fileKey, label: "Shared DS" });
+    const loaded = loadGraph();
+    expect(loaded?.graph.nodes.every((node) => node.fileKey === graph.fileKey)).toBe(true);
+    expect(listGraphs()[0]?.role).toBe("library");
   });
 });

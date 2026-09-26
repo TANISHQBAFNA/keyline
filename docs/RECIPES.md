@@ -112,7 +112,9 @@ Copy [`src/data/context-packs.example.json`](../src/data/context-packs.example.j
 
 `recommend` uses the same pack (or the active pack, or inline product/journey flags) **on top of** existing ranking: name/intent, variants, where-used, live over stale, retired last. Empty match still means do not invent.
 
-`verify_frame` stays invent / retired / unmatched. Pack `libraryRules` can deny a master; this is not a cross-product "wrong cousin" report.
+`verify_frame` stays invent / retired / unmatched. Pack `libraryRules` can deny a master. Wrong-cousin drift (same role, different family than the shared DS) is `resolve cousins` / `check_cousins` when `.graphify/workspace.json` has a library-role file.
+
+Optional pack fields: `files` (product/client file keys or labels from the workspace) and `client` (same shape as `product`, when product ≠ client). Same pack schema — not a second model. Recommend still prefers library-role masters.
 
 ## Try it
 
@@ -124,8 +126,9 @@ npm run resolve -- recipe "checkout summary"
 npm run resolve -- recommend "checkout primary button"
 npm run resolve -- recommend "primary button" --pack storefront-checkout-summary
 npm run resolve -- recommend "primary button" --product Storefront --journey summary --domain checkout
-# draw with returned Figma component ids
+# draw with returned Figma component ids (fileKey + figmaNodeId)
 npm run resolve -- verify "Checkout Summary"
+npm run resolve -- cousins "Checkout Summary" --job "checkout summary"
 ```
 
 MCP: `list_recipes`, `recipe` / `get_recipe` (query = id, title, or intent), `recommend` (optional `pack` / `product` / `journey` / `domain`). After ingest, recipe slots bind to live masters. Context packs scope those fills.

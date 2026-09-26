@@ -2,17 +2,25 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from "node
 import { join, resolve } from "node:path";
 import { DesignGraphSchema, type DesignGraph } from "@/core/model";
 import {
+  defaultIngestRole,
   indexGraph,
   mergeRecipes,
+  mergeWorkspaceGraphs,
   parseContextPackFile,
   parseLibraryRules,
   parseRecipeFile,
+  parseWorkspaceFile,
+  stampFileKey,
   starterRecipes,
+  upsertWorkspaceFile,
   type ContextBind,
   type ContextPackFile,
   type GraphIndex,
   type LibraryRules,
   type Recipe,
+  type WorkspaceFile,
+  type WorkspaceFileRole,
+  type WorkspaceManifest,
 } from "@/core/query";
 
 /**
@@ -21,8 +29,8 @@ import {
  *   .graphify/graph.json
  *
  * Optional designer files next to it: library-rules.json, recipes.json,
- * context-packs.json. Nodes + edges (CONTAINS, INSTANCE_OF, NESTS, …). Agents call recipe /
- * recommend / resolve — they do not Read the graph file.
+ * context-packs.json, workspace.json. Per-file graphs live in files/.
+ * Agents call recipe / recommend / resolve / cousins — they do not Read the graph file.
  */
 
 export interface StoredGraphSummary {
@@ -34,8 +42,10 @@ export interface StoredGraphSummary {
   edges: number;
   warnings: number;
   savedAt: string;
+  role?: WorkspaceFileRole;
+  label?: string;
   /** Roots the agent can start from — pages, or captured frames. */
-  entryPoints: Array<{ id: string; name: string; type: string; figmaNodeId?: string }>;
+  entryPoints: Array<{ id: string; name: string; type: string; figmaNodeId?: string; fileKey?: string }>;
 }
 
 export interface StoreIndex {
@@ -64,6 +74,23 @@ export function recipesPath(): string {
 /** Product + journey context packs. Missing file = no extra ranking context. */
 export function contextPacksPath(): string {
   return join(storeRoot(), "context-packs.json");
+}
+
+/** Designer-editable multi-file workspace. Missing file = single ingested graph. */
+export function workspacePath(): string {
+  return join(storeRoot(), "workspace.json");
+}
+
+export function workspaceFilesDir(): string {
+  return join(storeRoot(), "files");
+}
+
+export function safeFileKey(fileKey: string): string {
+  return fileKey.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 80) || "file";
+}
+
+export function fileGraphPath(fileKey: string): string {
+  return join(workspaceFilesDir(), `${safeFileKey(fileKey)}.json`);
 }
 
 export function readRecipeOverlay(explicitPath?: string): Recipe[] {
@@ -104,6 +131,7 @@ export function loadContextBind(
     const next = value?.trim();
     return next ? next : undefined;
   };
+  const workspace = readWorkspace();
   return {
     packs: file.packs,
     active: file.active,
@@ -111,7 +139,37 @@ export function loadContextBind(
     product: trim(args.product),
     journey: trim(args.journey),
     domain: trim(args.domain),
+    ...(workspace.files.length ? { workspace } : {}),
   };
+}
+
+export function readWorkspace(explicitPath?: string): WorkspaceManifest {
+  const path = explicitPath ?? (existsSync(workspacePath()) ? workspacePath() : undefined);
+  if (!path) return { version: 1, files: [] };
+  if (!existsSync(path)) {
+    throw new Error(`Workspace file not found: ${path}`);
+  }
+  const raw: unknown = JSON.parse(readFileSync(path, "utf8"));
+  return parseWorkspaceFile(raw);
+}
+
+export function writeWorkspace(manifest: WorkspaceManifest): void {
+  mkdirSync(storeRoot(), { recursive: true });
+  writeFileSync(workspacePath(), `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
+export function loadFileGraph(fileKey: string): DesignGraph | undefined {
+  const path = fileGraphPath(fileKey);
+  if (!existsSync(path)) return undefined;
+  return stampFileKey(DesignGraphSchema.parse(JSON.parse(readFileSync(path, "utf8"))));
+}
+
+export function writeFileGraph(graph: DesignGraph): string {
+  mkdirSync(workspaceFilesDir(), { recursive: true });
+  const stamped = stampFileKey(graph);
+  const path = fileGraphPath(stamped.fileKey);
+  writeFileSync(path, `${JSON.stringify(stamped, null, 2)}\n`);
+  return path;
 }
 
 export function readLibraryRules(explicitPath?: string): LibraryRules | undefined {
@@ -144,7 +202,8 @@ function summarise(graphId: string, graph: DesignGraph): StoredGraphSummary {
       id: node.id,
       name: node.name,
       type: node.type,
-      figmaNodeId: node.figmaNodeId,
+        figmaNodeId: node.figmaNodeId,
+        fileKey: node.fileKey ?? graph.fileKey,
     }));
 
   return {
@@ -157,6 +216,25 @@ function summarise(graphId: string, graph: DesignGraph): StoredGraphSummary {
     warnings: graph.warnings.length,
     savedAt: new Date().toISOString(),
     entryPoints,
+  };
+}
+
+function summariseWorkspaceFile(file: WorkspaceFile, graph?: DesignGraph): StoredGraphSummary {
+  if (graph) {
+    return { ...summarise(graphIdFor(graph.fileKey, file.label || graph.fileName), graph), role: file.role, label: file.label };
+  }
+  return {
+    graphId: graphIdFor(file.key, file.label || file.key),
+    fileKey: file.key,
+    fileName: file.label || file.key,
+    sourceKind: "workspace",
+    nodes: 0,
+    edges: 0,
+    warnings: 0,
+    savedAt: new Date(0).toISOString(),
+    role: file.role,
+    label: file.label,
+    entryPoints: [],
   };
 }
 
@@ -185,16 +263,69 @@ export function saveGraph(graph: DesignGraph, graphId?: string): StoredGraphSumm
 
 export function deleteGraph(_graphId?: string): boolean {
   const path = graphPath();
-  if (!existsSync(path)) return false;
-  rmSync(path);
+  let deleted = false;
+  if (existsSync(path)) {
+    rmSync(path);
+    deleted = true;
+  }
+  const filesDir = workspaceFilesDir();
+  if (existsSync(filesDir)) {
+    rmSync(filesDir, { recursive: true });
+    deleted = true;
+  }
   cache.clear();
-  return true;
+  return deleted;
 }
 
 export function listGraphs(): StoredGraphSummary[] {
+  const workspace = readWorkspace();
+  if (workspace.files.length) {
+    return workspace.files.map((file) => summariseWorkspaceFile(file, loadFileGraph(file.key)));
+  }
   const loaded = loadGraph();
   if (!loaded) return [];
   return [summarise(graphIdFor(loaded.graph.fileKey, loaded.graph.fileName), loaded.graph)];
+}
+
+export function mergeStoredWorkspace(workspace = readWorkspace()): DesignGraph | undefined {
+  const inputs = workspace.files
+    .map((file) => {
+      const graph = loadFileGraph(file.key);
+      return graph ? { graph, role: file.role } : undefined;
+    })
+    .filter((entry): entry is { graph: DesignGraph; role: WorkspaceFileRole } => Boolean(entry));
+  if (!inputs.length) return undefined;
+  return mergeWorkspaceGraphs(inputs, workspace);
+}
+
+export function saveIngestedFile(
+  graph: DesignGraph,
+  options: { role?: WorkspaceFileRole; url?: string; label?: string; graphId?: string } = {},
+): StoredGraphSummary {
+  const stamped = stampFileKey(graph);
+  writeFileGraph(stamped);
+  const current = readWorkspace();
+  const role = options.role ?? current.files.find((file) => file.key === stamped.fileKey)?.role ?? defaultIngestRole(current);
+  const existing = current.files.find((file) => file.key === stamped.fileKey);
+  const next: WorkspaceFile = {
+    role,
+    key: stamped.fileKey,
+    url: options.url ?? existing?.url,
+    label: options.label ?? existing?.label ?? stamped.fileName,
+  };
+  const workspace = upsertWorkspaceFile(current, next);
+  writeWorkspace(workspace);
+  const merged = mergeWorkspaceGraphs(
+    workspace.files
+      .map((file) => {
+        const fileGraph = file.key === stamped.fileKey ? stamped : loadFileGraph(file.key);
+        return fileGraph ? { graph: fileGraph, role: file.role } : undefined;
+      })
+      .filter((entry): entry is { graph: DesignGraph; role: WorkspaceFileRole } => Boolean(entry)),
+    workspace,
+  );
+  cache.clear();
+  return { ...saveGraph(merged, options.graphId), role, label: next.label };
 }
 
 /** No sidecar index. Kept so CLI `reindex` still runs. */
@@ -208,10 +339,18 @@ export function loadGraph(_graphId?: string): { graph: DesignGraph; index: Graph
   const cached = cache.get("graph");
   if (cached) return cached;
 
+  const workspace = existsSync(workspacePath()) ? readWorkspace() : { version: 1 as const, files: [] };
+  const merged = workspace.files.length ? mergeStoredWorkspace(workspace) : undefined;
+  if (merged) {
+    const entry = { graph: merged, index: indexGraph(merged) };
+    cache.set("graph", entry);
+    return entry;
+  }
+
   const path = graphPath();
   if (!existsSync(path)) return undefined;
 
-  const graph = DesignGraphSchema.parse(JSON.parse(readFileSync(path, "utf8")));
+  const graph = stampFileKey(DesignGraphSchema.parse(JSON.parse(readFileSync(path, "utf8"))));
   const entry = { graph, index: indexGraph(graph) };
   cache.set("graph", entry);
   return entry;

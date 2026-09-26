@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { parseLibraryRules, type LibraryRules } from "./agentSurface";
+import type { WorkspaceManifest } from "./workspace";
 
 /**
  * Product + journey context packs. Designers edit JSON under .graphify/.
@@ -15,11 +16,15 @@ export interface ContextConstraints {
 export interface ContextPack {
   id: string;
   product?: { id?: string; name?: string };
+  /** When product ≠ client, same pack schema — not a second model. */
+  client?: { id?: string; name?: string };
   domain?: string;
   journey?: { step?: string; screenJob?: string };
   audience?: string;
   constraints?: ContextConstraints;
   recipeIds?: string[];
+  /** Optional product/client file keys or labels from `.graphify/workspace.json`. */
+  files?: string[];
   libraryRules?: LibraryRules;
 }
 
@@ -35,13 +40,16 @@ export interface ContextBind {
   product?: string;
   journey?: string;
   domain?: string;
+  workspace?: WorkspaceManifest;
 }
 
 export interface AppliedContext {
   id: string;
   product?: string;
+  client?: string;
   domain?: string;
   journey?: string;
+  files?: string[];
 }
 
 export interface ContextQuery {
@@ -125,11 +133,13 @@ function parseOne(raw: unknown): ContextPack[] {
     {
       id: id.data,
       product: productOf(record["product"]),
+      client: productOf(record["client"]),
       domain: typeof record["domain"] === "string" ? record["domain"].trim() || undefined : undefined,
       journey: journeyOf(record["journey"]),
       audience: typeof record["audience"] === "string" ? record["audience"].trim() || undefined : undefined,
       constraints: constraintsOf(record["constraints"]),
       recipeIds: stringList(record["recipeIds"] ?? record["recipes"]),
+      files: stringList(record["files"]),
       ...(hasRules ? { libraryRules } : {}),
     },
   ];
@@ -148,18 +158,22 @@ export function parseContextPackFile(raw: unknown): ContextPackFile {
 
 export function appliedContext(pack: ContextPack): AppliedContext {
   const product = pack.product?.name || pack.product?.id;
+  const client = pack.client?.name || pack.client?.id;
   const journey = pack.journey?.screenJob || pack.journey?.step;
   return {
     id: pack.id,
     ...(product ? { product } : {}),
+    ...(client ? { client } : {}),
     ...(pack.domain ? { domain: pack.domain } : {}),
     ...(journey ? { journey } : {}),
+    ...(pack.files?.length ? { files: pack.files } : {}),
   };
 }
 
 export function contextPhrase(pack: ContextPack): string {
   return [
     pack.product?.name || pack.product?.id,
+    pack.client?.name || pack.client?.id,
     pack.domain,
     pack.journey?.screenJob || pack.journey?.step,
     pack.audience,

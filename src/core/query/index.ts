@@ -8,3 +8,6 @@ export * from "./projection";
 export * from "./agentSurface";
 export * from "./contextPacks";
 export * from "./recipes";
+export * from "./workspace";
+export * from "./workspaceMerge";
+export * from "./cousins";

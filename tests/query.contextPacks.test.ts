@@ -128,6 +128,8 @@ const samplePackFile = {
       audience: "returning shopper",
       constraints: { density: "compact", a11y: "wcag-aa" },
       recipeIds: ["checkout-summary"],
+      files: ["Storefront"],
+      client: { id: "northwind", name: "Northwind" },
       libraryRules: { deny: ["Banner"] },
       figmaNodeId: "9:1",
     },
@@ -154,6 +156,8 @@ describe("context pack load", () => {
     expect(pack?.audience).toBe("returning shopper");
     expect(pack?.constraints).toEqual({ density: "compact", a11y: "wcag-aa" });
     expect(pack?.recipeIds).toEqual(["checkout-summary"]);
+    expect(pack?.files).toEqual(["Storefront"]);
+    expect(pack?.client).toEqual({ id: "northwind", name: "Northwind" });
     expect(pack?.libraryRules).toEqual({ deny: ["Banner"] });
     expect(pack && "figmaNodeId" in pack).toBe(false);
   });
