@@ -101,6 +101,7 @@ describe("agent tools", () => {
     expect(names.properties).toHaveProperty("pack");
     expect(names.properties).toHaveProperty("product");
     expect(names.properties).toHaveProperty("journey");
+    expect(names.properties).toHaveProperty("domain");
     const result = callTool("recommend", {
       intent: "primary button",
       product: "storefront",
@@ -108,5 +109,17 @@ describe("agent tools", () => {
       domain: "checkout",
     }) as { candidates: Array<{ id: string }>; context?: { id: string } };
     expect(Array.isArray(result.candidates)).toBe(true);
+  });
+
+  it("recipe, list_recipes, and verify_frame accept the same pack-bind fields as recommend", () => {
+    for (const name of ["recipe", "get_recipe", "list_recipes", "verify_frame"] as const) {
+      const schema = TOOLS.find((tool) => tool.name === name)?.inputSchema as {
+        properties: Record<string, unknown>;
+      };
+      expect(schema.properties).toHaveProperty("pack");
+      expect(schema.properties).toHaveProperty("product");
+      expect(schema.properties).toHaveProperty("journey");
+      expect(schema.properties).toHaveProperty("domain");
+    }
   });
 });

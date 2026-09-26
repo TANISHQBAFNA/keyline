@@ -32,6 +32,10 @@ import { deleteGraph, graphIdFor, graphPath, listGraphs, loadContextBind, loadRe
  * Agents call resolve (usage card), then Figma. Do not Read the graph file.
  */
 
+/** Same flags `bindFromFlags` reads — keep help + usage errors in lockstep. */
+const PACK_BIND_FLAGS =
+  "[--pack <id>] [--product <name>] [--journey <step>] [--domain <domain>]";
+
 function usage(): void {
   process.stdout.write(
     [
@@ -44,20 +48,20 @@ function usage(): void {
       "      Token from FIGMA_ACCESS_TOKEN. Writes .graphify/graph.json — agents call resolve, do not Read that file.",
       "      Re-run ingest to refresh the library before recommend / verify_frame.",
       "",
-      "  resolve recipe [list | \"<name or intent>\"] [--id] [--intent \"<brief>\"] [--pack <id>] [--product <name>] [--journey <step>] [--domain <domain>]",
+      `  resolve recipe [list | "<name or intent>"] [--id] [--intent "<brief>"] ${PACK_BIND_FLAGS}`,
       "      Screen packs. Overlay .graphify/recipes.json still wins.",
       "      After ingest, list/get bind slots to live masters (or next recommend query).",
       "      Matching .graphify/context-packs.json scopes slot fills + nextRecommend.",
       "      Never invents node ids. Unbound: recommend then verify_frame.",
-      "  resolve recommend \"<intent>\" [--id] [--budget <chars>] [--pack <id>] [--product <name>] [--journey <step>] [--domain <domain>]",
+      `  resolve recommend "<intent>" [--id] [--budget <chars>] ${PACK_BIND_FLAGS}`,
       "      Ranked masters: name/intent, variant props, where-used, co-occurrence.",
-      "      Product/journey context on top. Live over stale. Deprecated demoted. Cap ~2000 chars. Place returned ids only.",
+      "      Product/journey/domain context on top. Live over stale. Deprecated demoted. Cap ~2000 chars. Place returned ids only.",
       "  resolve resolve \"<name>\" [--id] [--budget <chars>]",
       "      Usage card: screens, slot fills, figmaNodeId. When you already know the name.",
-      "  resolve verify \"<frame>\" [--id] [--components a,b] [--rules <file>] [--pack <id>]",
+      `  resolve verify "<frame>" [--id] [--components a,b] [--rules <file>] ${PACK_BIND_FLAGS}`,
       "      After drawing: pass/fail, invents, deprecated, unresolved. Measures invent rate.",
       "      Optional .graphify/library-rules.json { allow, deny }. Else in-graph + not deprecated = approved.",
-      "      Pack libraryRules are a light hook — not a cross-product cousin report.",
+      "      Same pack flags as recommend. Pack libraryRules are a light hook — not a cross-product cousin report.",
       "  resolve orient [--id <graphId>]     Optional god-node summary. Prefer recommend / resolve.",
       "  resolve query \"<question>\" [--id] [--budget <chars>]",
       "      Optional scoped subgraph. Agents should recommend or resolve a component instead.",
@@ -321,7 +325,9 @@ async function main(argv: string[]): Promise<void> {
             .filter(Boolean)
         : undefined;
       if (!frame && !components?.length) {
-        throw new Error('Usage: resolve verify "<frame>" [--components a,b] [--rules file]');
+        throw new Error(
+          `Usage: resolve verify "<frame>" [--components a,b] [--rules file] ${PACK_BIND_FLAGS}`,
+        );
       }
       const rulesPath = flag(args, "rules");
       printJson(

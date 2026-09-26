@@ -57,7 +57,7 @@ npm run resolve -- verify --components "Button,MadeUpCard"
 
 After ingest, `recipe list` / `recipe "<job>"` bind slots to live `figmaNodeId`s. Overlay `.graphify/recipes.json` still wins. Unbound slots include the next `recommend` query. Bound ids that are missing or deprecated are flagged.
 
-`recommend` ranks by name/intent, variant props, where-used, sibling co-occurrence; live over stale; deprecated last. Optional product/journey context pack (`.graphify/context-packs.json`, or `--pack` / `--product` / `--journey`) ranks on top of that. Cap ~2000 chars. Empty match still means do not invent.
+`recommend` ranks by name/intent, variant props, where-used, sibling co-occurrence; live over stale; deprecated last. Optional product/journey/domain context pack (`.graphify/context-packs.json`, or `--pack` / `--product` / `--journey` / `--domain`) ranks on top of that. The same flags bind `recipe` list/get and `verify`. Cap ~2000 chars. Empty match still means do not invent.
 
 When you already know the master name:
 
@@ -70,15 +70,15 @@ Use the card + `figmaNodeId`. Prefer **resolve** over any keyline / graphify ali
 
 Optional allow/deny file: `.graphify/library-rules.json` with `{ "allow": [...], "deny": [...] }`. If missing, approved = in-graph master and not deprecated.
 
-Designers add screen packs in JSON — see [`docs/RECIPES.md`](RECIPES.md). Overlay: `.graphify/recipes.json`. Product + journey: `.graphify/context-packs.json`.
+Designers add screen packs in JSON — see [`docs/RECIPES.md`](RECIPES.md). Overlay: `.graphify/recipes.json`. Product + journey + domain: `.graphify/context-packs.json`.
 
 ## Everyday screen flow
 
 1. **Ingest** — (refresh) store the library
-2. **Context / recipe** — (optional) named pack for the screen job; optional product+journey context pack
-3. **Recommend** — unbound slots / free-text brief → ranked masters (context-scoped when a pack is bound)
+2. **Context / recipe** — (optional) named pack for the screen job; optional product + journey + domain context pack (`--pack` / `--product` / `--journey` / `--domain`)
+3. **Recommend** — unbound slots / free-text brief → ranked masters (context-scoped when a pack is bound; same flags)
 4. **Draw** — `use_figma` / `get_design_context` on those `figmaNodeId`s only
-5. **Verify** — invents / deprecated / unresolved
+5. **Verify** — invents / deprecated / unresolved (same optional `--pack` / `--product` / `--journey` / `--domain`)
 6. **Human taste** — review before expanding scope
 
 **Do not** `Read` `.graphify/graph.json`. Resolve cards are the cheap path.

@@ -115,7 +115,15 @@ If you wrote a context pack (below), you can name it:
 npm run resolve -- recommend "primary button" --pack storefront-checkout-summary
 ```
 
-**You get:** A short ranked list. Live, used masters rise. Retired ones sink. Product and journey words sit **on top of** name matching — so “Primary button” in a Storefront checkout pack prefers the checkout Primary, not a random cousin.
+Or skip the pack name and say which **product**, which **journey step**, and which **domain** (the area of the product — checkout, settings, onboarding) this screen is for:
+
+```bash
+npm run resolve -- recommend "primary button" --product Storefront --journey summary --domain checkout
+```
+
+`recipe` and `verify` take the same extras, so ranking and the after-draw check follow the same product and step.
+
+**You get:** A short ranked list. Live, used masters rise. Retired ones sink. Product, journey, and domain words sit **on top of** name matching — so “Primary button” in a Storefront checkout pack prefers the checkout Primary, not a random cousin.
 
 If the list is empty: **do not invent a component.** Change the words (use names from your library), re-ingest, or pick a different pack.
 
@@ -137,6 +145,12 @@ You can also pass the names it placed:
 npm run resolve -- verify --components "Button,MadeUpCard"
 ```
 
+To apply the same product and step as recommend (including a pack’s deny list):
+
+```bash
+npm run resolve -- verify "Checkout Summary" --product Storefront --journey summary --domain checkout
+```
+
 **You get:** Pass or fail. Invented names (like `MadeUpCard`) fail. Retired masters fail. Pieces Resolve cannot match fail. You then judge taste in Figma.
 
 ### 6. You review
@@ -153,9 +167,9 @@ When Resolve is connected, the agent can call the same steps by name:
 |------|----------------|
 | `list_recipes` | List screen packs |
 | `recipe` | Get one pack (for example `"checkout summary"`) |
-| `recommend` | Rank live masters for a brief; optional pack / product / journey |
+| `recommend` | Rank live masters for a brief; you can name a pack, or the product, journey step, and domain |
 | `resolve` | Look up a master you already know by name (for example `"Main Card"`) |
-| `verify_frame` | Check the drawn frame or the placed names |
+| `verify_frame` | Check the drawn frame or the placed names; same optional pack / product / journey / domain |
 
 On the Figma side, the agent may open a component **only after** one of those cards returned its id. Everyday names for that are `use_figma` and `get_design_context`.
 
@@ -225,10 +239,10 @@ Resolve needs to know *which pack goes with which screen job*. First match wins:
 1. **You name the pack** — `--pack storefront-checkout-summary` (or the same `pack` field in the AI tool).
 2. **The recipe names a pack** — `"contextPackId": "storefront-checkout-summary"` on the recipe. Prefer putting `recipeIds` on the pack instead, so one product/journey file owns the bind.
 3. **The pack lists the recipe** — `"recipeIds": ["checkout-summary"]`. This is the usual designer path.
-4. **You pass product / journey / domain** — `--product Storefront --journey summary` (or the same fields in the AI tool). Resolve picks the best matching pack.
+4. **You pass product / journey / domain** — `--product Storefront --journey summary --domain checkout` (or the same fields in the AI tool). Resolve picks the best matching pack.
 5. **The file’s `active` pack** — used when it lists this recipe, or when it lists none.
 
-Recommend uses the same pack (or the active pack, or the product/journey flags) **on top of** its usual ranking: name, variants, where it is already used, live over stale, retired last.
+Recommend uses the same pack (or the active pack, or the product / journey / domain flags) **on top of** its usual ranking: name, variants, where it is already used, live over stale, retired last.
 
 You can add or replace screen packs in `.graphify/recipes.json`. Matching `id` replaces a starter. Leave the stored Figma id off a slot unless that master is already in the ingested library. Details and a copy-paste recipe live in [Screen recipes](RECIPES.md).
 
@@ -266,7 +280,7 @@ Be honest with yourself and with agents:
 
 **Recommend comes back empty.** The library was not ingested, the words do not match any master, or the live matches are all retired. Re-ingest. Use names from your library (“Primary button”, not “CTA widget”). Do not invent a fallback.
 
-**The context pack does not seem to apply.** The file must live at `.graphify/context-packs.json` — the example under `src/data/` is only a template. `recipeIds` must be the recipe id (`checkout-summary`). Set `active`, or pass `--pack`, or pass product / journey. Then run `recipe "checkout summary"` again and look for the product/journey on the card.
+**The context pack does not seem to apply.** The file must live at `.graphify/context-packs.json` — the example under `src/data/` is only a template. `recipeIds` must be the recipe id (`checkout-summary`). Set `active`, or pass `--pack`, or pass the product, journey step, and domain. Then run `recipe "checkout summary"` again and look for the product and journey on the card.
 
 **Picks feel stale after a library change.** Re-run ingest. That is the refresh path. There is no silent live sync.
 

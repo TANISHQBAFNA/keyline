@@ -65,6 +65,7 @@ npm run resolve -- recipe list
 npm run resolve -- recipe "checkout summary"
 npm run resolve -- recommend "checkout summary with primary button"
 npm run resolve -- recommend "primary button" --pack storefront-checkout-summary
+npm run resolve -- recommend "primary button" --product Storefront --journey summary --domain checkout
 npm run resolve -- verify "Checkout Summary"
 ```
 

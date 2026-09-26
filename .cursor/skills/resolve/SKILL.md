@@ -10,10 +10,10 @@ description: Use Resolve before any Figma screen build or design-from-brief work
 ## Forced path (do this, in order)
 
 1. **Ingest** — store the library. Re-run when Figma changed.
-2. **Recipe** — if the screen job matches a pack (`recipe list` / `recipe "<job>"`). After ingest, slots bind to live `figmaNodeId`s. Overlay `.graphify/recipes.json` still wins. Optional `.graphify/context-packs.json` scopes product + journey (slot fills + `nextRecommend`).
-3. **Recommend** — every unbound / missing / deprecated slot. Use that slot’s `nextRecommend` query. Optional `--pack` / `--product` / `--journey` (or the active pack).
+2. **Recipe** — if the screen job matches a pack (`recipe list` / `recipe "<job>"`). After ingest, slots bind to live `figmaNodeId`s. Overlay `.graphify/recipes.json` still wins. Optional `.graphify/context-packs.json` scopes product + journey + domain (slot fills + `nextRecommend`). Optional `--pack` / `--product` / `--journey` / `--domain`.
+3. **Recommend** — every unbound / missing / deprecated slot. Use that slot’s `nextRecommend` query. Optional `--pack` / `--product` / `--journey` / `--domain` (or the active pack).
 4. **Place** — Figma MCP (`use_figma` / `get_design_context`) on returned ids **only**.
-5. **Verify** — `verify_frame` on the new frame or placed names.
+5. **Verify** — `verify_frame` on the new frame or placed names. Same optional `--pack` / `--product` / `--journey` / `--domain`.
 6. **Human taste** — stop. Do not over-generate.
 
 Prefer **resolve** over any `keyline` / `graphify` alias. `npm run keyline` is a deprecated alias this release.
@@ -27,6 +27,7 @@ npm run resolve -- recipe list
 npm run resolve -- recipe "checkout summary"
 npm run resolve -- recommend "checkout with primary button and input"
 npm run resolve -- recommend "primary button" --pack storefront-checkout-summary
+npm run resolve -- recommend "primary button" --product Storefront --journey summary --domain checkout
 npm run resolve -- resolve "Main Card"            # only if you already know the name
 npm run resolve -- verify "Checkout Summary"
 npm run resolve -- verify --components "Button,MadeUpCard"
@@ -42,7 +43,7 @@ npm run resolve -- verify --components "Button,MadeUpCard"
 
 Optional allow/deny: `.graphify/library-rules.json` `{ "allow": ["Button"], "deny": ["Banner"] }`. If missing, approved = in-graph MAIN_COMPONENT / VARIANT (or COMPONENT_SET) and not deprecated.
 
-Designers edit `src/data/recipes.json` or overlay `.graphify/recipes.json`. Product + journey: `.graphify/context-packs.json` (see `docs/RECIPES.md`). Do not invent `defaultMasterId`s or Figma node ids in packs.
+Designers edit `src/data/recipes.json` or overlay `.graphify/recipes.json`. Product + journey + domain: `.graphify/context-packs.json` (see `docs/RECIPES.md`). Do not invent `defaultMasterId`s or Figma node ids in packs.
 
 Skill tools: `list_recipes`, `recipe` / `get_recipe`, `recommend`, `resolve`, `verify_frame`, `get_screen_inventory`, `check_frame` (analog shortcut).
 

@@ -48,7 +48,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "recommend",
     description:
-      "Intent in, ranked library masters out. Ranks by name/intent, variant props, where-used and sibling co-occurrence, live over stale, deprecated demoted. Optional product/journey context pack (or --pack / active pack) scopes ranking for this product and this journey step. Returns figmaNodeId. Cap ~2000 chars. Forced path: ingest (refresh if library changed) → optional context pack / recipe → recommend unbound slots → place only returned ids → verify_frame. Do not invent components. Do not Read graph.json.",
+      "Intent in, ranked library masters out. Ranks by name/intent, variant props, where-used and sibling co-occurrence, live over stale, deprecated demoted. Optional product/journey/domain context pack (or pack / product / journey / domain, or the active pack) scopes ranking for this product and this journey step. Returns figmaNodeId. Cap ~2000 chars. Forced path: ingest (refresh if library changed) → optional context pack / recipe → recommend unbound slots → place only returned ids → verify_frame. Do not invent components. Do not Read graph.json.",
     inputSchema: {
       type: "object",
       properties: {
@@ -147,7 +147,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "verify_frame",
     description:
-      "After drawing, check a frame or a proposed component list against the library graph. Pass iff every placement is an in-graph MAIN_COMPONENT/VARIANT (or COMPONENT_SET) and not deprecated. Flags invents, deprecated, unresolved. Optional allow/deny rules file. Deterministic — no LLM. Use to measure invent rate.",
+      "After drawing, check a frame or a proposed component list against the library graph. Pass iff every placement is an in-graph MAIN_COMPONENT/VARIANT (or COMPONENT_SET) and not deprecated. Flags invents, deprecated, unresolved. Optional allow/deny rules file. Optional pack / product / journey / domain applies pack libraryRules (still invent/deprecated/unresolved only). Deterministic — no LLM. Use to measure invent rate.",
     inputSchema: {
       type: "object",
       properties: {
@@ -175,7 +175,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "list_recipes",
     description:
-      "List screen recipes (composition packs). When a graph is ingested, slots bind to live masters (fill or suggest figmaNodeIds from recommend). Overlay .graphify/recipes.json still wins. Matching product+journey context packs (.graphify/context-packs.json) scope slot fills and nextRecommend. Unbound slots include the next recommend query. Never invents node ids. Next: recipe \"<id or intent>\". Do not Read graph.json.",
+      "List screen recipes (composition packs). When a graph is ingested, slots bind to live masters (fill or suggest figmaNodeIds from recommend). Overlay .graphify/recipes.json still wins. Matching product+journey+domain context packs (.graphify/context-packs.json) scope slot fills and nextRecommend. Optional pack / product / journey / domain. Unbound slots include the next recommend query. Never invents node ids. Next: recipe \"<id or intent>\". Do not Read graph.json.",
     inputSchema: {
       type: "object",
       properties: {
@@ -190,7 +190,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "recipe",
     description:
-      "Get a screen recipe by id, title, or intent. After ingest, slots resolve against live masters (overlay .graphify/recipes.json still wins). Matching product+journey context pack scopes slot fills and nextRecommend. Unbound slots include the next recommend query. Never invents node ids. After placing: verify_frame. Do not Read graph.json.",
+      "Get a screen recipe by id, title, or intent. After ingest, slots resolve against live masters (overlay .graphify/recipes.json still wins). Matching product+journey+domain context pack scopes slot fills and nextRecommend. Optional pack / product / journey / domain. Unbound slots include the next recommend query. Never invents node ids. After placing: verify_frame. Do not Read graph.json.",
     inputSchema: {
       type: "object",
       properties: {
