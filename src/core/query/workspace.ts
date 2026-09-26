@@ -23,8 +23,7 @@ export interface WorkspaceManifest {
 
 export const emptyWorkspace = (): WorkspaceManifest => ({ version: 1, files: [] });
 
-function roleOf(raw: unknown): WorkspaceFileRole | undefined {
-  if (typeof raw !== "string") return undefined;
+function asRole(raw: string): WorkspaceFileRole | undefined {
   const role = raw.trim().toLowerCase();
   switch (role) {
     case "library":
@@ -34,6 +33,24 @@ function roleOf(raw: unknown): WorkspaceFileRole | undefined {
     default:
       return undefined;
   }
+}
+
+function roleOf(raw: unknown): WorkspaceFileRole | undefined {
+  if (typeof raw !== "string") return undefined;
+  return asRole(raw);
+}
+
+/**
+ * CLI `--role`. Omit the flag → undefined (caller defaults). A present
+ * value that is not library | product | client throws — never a silent fallback.
+ */
+export function parseIngestRole(raw: string | undefined): WorkspaceFileRole | undefined {
+  if (raw === undefined) return undefined;
+  const role = asRole(raw);
+  if (role) return role;
+  const listed = WORKSPACE_FILE_ROLES.join(", ");
+  const shown = raw.trim() || raw;
+  throw new Error(`Unknown --role "${shown}". Valid roles: ${listed}.`);
 }
 
 function keyOf(record: Record<string, unknown>): string | undefined {

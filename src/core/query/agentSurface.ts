@@ -1177,23 +1177,24 @@ export function verifyFrame(
 
   const fileOf = (node: GraphNode) => nodeFileKey(node, index.graph.fileKey);
 
+  const stampHit = (node: GraphNode, extra: Omit<VerifyHit, "name" | "id" | "figmaNodeId" | "fileKey"> = {}): VerifyHit => {
+    const fileKey = fileOf(node);
+    return {
+      name: node.name,
+      id: node.id,
+      figmaNodeId: node.figmaNodeId,
+      ...(fileKey ? { fileKey } : {}),
+      ...extra,
+    };
+  };
+
   const considerMaster = (master: GraphNode, given: string) => {
     if (blockedByRules(master, given)) {
-      pushUnique(
-        invents,
-        seenInvent,
-        { name: master.name, id: master.id, figmaNodeId: master.figmaNodeId, fileKey: fileOf(master), reason: "denied" },
-        `denied:${master.id}`,
-      );
+      pushUnique(invents, seenInvent, stampHit(master, { reason: "denied" }), `denied:${master.id}`);
       return;
     }
     if (master.status === "deprecated") {
-      pushUnique(
-        deprecatedHits,
-        seenDeprecated,
-        { name: master.name, id: master.id, figmaNodeId: master.figmaNodeId, fileKey: fileOf(master), status: "deprecated" },
-        master.id,
-      );
+      pushUnique(deprecatedHits, seenDeprecated, stampHit(master, { status: "deprecated" }), master.id);
       return;
     }
     approvedIds.add(master.id);
@@ -1217,7 +1218,7 @@ export function verifyFrame(
           pushUnique(
             unresolved,
             seenUnresolved,
-            { name: instance.name, id: instance.id, reason: "unresolved-instance" },
+            stampHit(instance, { reason: "unresolved-instance" }),
             instance.id,
           );
           continue;
@@ -1237,12 +1238,7 @@ export function verifyFrame(
     }
     const master = asMaster(index, node);
     if (!master) {
-      pushUnique(
-        invents,
-        seenInvent,
-        { name: node.name, id: node.id, figmaNodeId: node.figmaNodeId, fileKey: fileOf(node), reason: "not-a-master" },
-        `invent:${node.id}`,
-      );
+      pushUnique(invents, seenInvent, stampHit(node, { reason: "not-a-master" }), `invent:${node.id}`);
       continue;
     }
     considerMaster(master, given);
@@ -1255,7 +1251,12 @@ export function verifyFrame(
     invents,
     deprecated: deprecatedHits,
     unresolved,
-    frame: frameNode ? briefNode(frameNode) : undefined,
+    frame: frameNode
+      ? {
+          ...briefNode(frameNode),
+          ...(fileOf(frameNode) ? { fileKey: fileOf(frameNode) } : {}),
+        }
+      : undefined,
     builtAt: index.graph.builtAt,
     hint: pass
       ? `Only approved library masters. ${REFRESH_HINT}`

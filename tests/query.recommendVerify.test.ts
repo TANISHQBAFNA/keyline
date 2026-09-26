@@ -236,4 +236,28 @@ describe("verify_frame (invent detection)", () => {
     expect(result.pass).toBe(false);
     expect(result.invents.some((hit) => hit.reason === "denied" && hit.name === "Card")).toBe(true);
   });
+
+  it("stamps fileKey next to figmaNodeId on frame, invent, deprecated, and unresolved cards", () => {
+    const { index } = rankingLab();
+    const ok = verifyFrame(index, { frame: "Checkout Summary" });
+    expect(ok.frame?.figmaNodeId).toBe("1:1");
+    expect(ok.frame?.fileKey).toBe("RANK");
+
+    const denied = verifyFrame(index, { components: ["Pay CTA"], rules: { deny: ["Pay CTA"] } });
+    expect(denied.invents[0]?.figmaNodeId).toBe("9:1");
+    expect(denied.invents[0]?.fileKey).toBe("RANK");
+    expect(denied.invents[0]?.reason).toBe("denied");
+
+    const deprecated = verifyFrame(demo, { components: [ids.banner] });
+    expect(deprecated.deprecated[0]?.figmaNodeId).toBeTruthy();
+    expect(deprecated.deprecated[0]?.fileKey).toBe("TESTKEY");
+
+    const receipt = verifyFrame(demo, { frame: "Receipt" });
+    expect(receipt.unresolved.length).toBeGreaterThan(0);
+    expect(receipt.unresolved.every((hit) => hit.reason === "unresolved-instance")).toBe(true);
+    expect(receipt.unresolved.every((hit) => hit.fileKey === "TESTKEY")).toBe(true);
+    expect(receipt.unresolved.every((hit) => Boolean(hit.figmaNodeId))).toBe(true);
+    expect(receipt.frame?.fileKey).toBe("TESTKEY");
+    expect(receipt.frame?.figmaNodeId).toBeTruthy();
+  });
 });
