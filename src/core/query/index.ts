@@ -6,4 +6,5 @@ export * from "./subgraph";
 export * from "./communities";
 export * from "./projection";
 export * from "./agentSurface";
+export * from "./contextPacks";
 export * from "./recipes";

@@ -55,7 +55,7 @@ npm run resolve -- verify --components "Button,MadeUpCard"
 
 After ingest, `recipe list` / `recipe "<job>"` bind slots to live `figmaNodeId`s. Overlay `.graphify/recipes.json` still wins. Unbound slots include the next `recommend` query. Bound ids that are missing or deprecated are flagged.
 
-`recommend` ranks by name/intent, variant props, where-used, sibling co-occurrence; live over stale; deprecated last. Cap ~2000 chars.
+`recommend` ranks by name/intent, variant props, where-used, sibling co-occurrence; live over stale; deprecated last. Optional product/journey context pack (`.graphify/context-packs.json`, or `--pack` / `--product` / `--journey`) ranks on top of that. Cap ~2000 chars. Empty match still means do not invent.
 
 When you already know the master name:
 
@@ -68,13 +68,13 @@ Use the card + `figmaNodeId`. Prefer **resolve** over any keyline / graphify ali
 
 Optional allow/deny file: `.graphify/library-rules.json` with `{ "allow": [...], "deny": [...] }`. If missing, approved = in-graph master and not deprecated.
 
-Designers add screen packs in JSON — see [`docs/RECIPES.md`](RECIPES.md). Overlay: `.graphify/recipes.json`.
+Designers add screen packs in JSON — see [`docs/RECIPES.md`](RECIPES.md). Overlay: `.graphify/recipes.json`. Product + journey: `.graphify/context-packs.json`.
 
 ## Everyday screen flow
 
 1. **Ingest** — (refresh) store the library
-2. **Recipe** — (optional) named pack for the screen job
-3. **Recommend** — unbound slots / free-text brief → ranked masters
+2. **Context / recipe** — (optional) named pack for the screen job; optional product+journey context pack
+3. **Recommend** — unbound slots / free-text brief → ranked masters (context-scoped when a pack is bound)
 4. **Draw** — `use_figma` / `get_design_context` on those `figmaNodeId`s only
 5. **Verify** — invents / deprecated / unresolved
 6. **Human taste** — review before expanding scope

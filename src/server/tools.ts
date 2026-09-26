@@ -18,12 +18,13 @@ import {
   usageSummaryFor,
   verifyFrame,
   withCost,
+  packForRecommend,
   type GraphIndex,
   type GraphLevel,
   type ViewMode,
 } from "@/core/query";
 import { buildAiGraphContext, toMarkdownPrompt } from "@/core/ai";
-import { listGraphs, loadRecipes, readLibraryRules, resolveGraph } from "./store";
+import { listGraphs, loadContextBind, loadRecipes, readLibraryRules, resolveGraph } from "./store";
 
 /**
  * Optional MCP tools. Agents: recommend / recipe / resolve / verify_frame / check_frame.
@@ -47,7 +48,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "recommend",
     description:
-      "Intent in, ranked library masters out. Ranks by name/intent, variant props, where-used and sibling co-occurrence, live over stale, deprecated demoted. Returns figmaNodeId. Cap ~2000 chars. Forced path: ingest (refresh if library changed) → recipe if the screen job matches → recommend unbound slots → place only returned ids → verify_frame. Do not invent components. Do not Read graph.json.",
+      "Intent in, ranked library masters out. Ranks by name/intent, variant props, where-used and sibling co-occurrence, live over stale, deprecated demoted. Optional product/journey context pack (or --pack / active pack) scopes ranking for this product and this journey step. Returns figmaNodeId. Cap ~2000 chars. Forced path: ingest (refresh if library changed) → optional context pack / recipe → recommend unbound slots → place only returned ids → verify_frame. Do not invent components. Do not Read graph.json.",
     inputSchema: {
       type: "object",
       properties: {
@@ -56,6 +57,13 @@ export const TOOLS: ToolDefinition[] = [
           type: "string",
           description: 'Free-text brief, e.g. "approval summary with primary button and input"',
         },
+        pack: {
+          type: "string",
+          description: "Context pack id from .graphify/context-packs.json. Else the file's active pack.",
+        },
+        product: { type: "string", description: "Product id or name. Scopes ranking when a pack matches, else inline." },
+        journey: { type: "string", description: "Journey step / screen job. Scopes ranking on top of name/intent." },
+        domain: { type: "string", description: 'Product domain, e.g. "checkout" or "onboarding".' },
         budgetChars: { type: "number", description: "Hard cap on JSON chars. Default 2000." },
       },
       required: ["intent"],
@@ -157,22 +165,32 @@ export const TOOLS: ToolDefinition[] = [
         },
         allow: { type: "array", items: { type: "string" }, description: "Inline allow list (names or ids)." },
         deny: { type: "array", items: { type: "string" }, description: "Inline deny list (names or ids)." },
+        pack: { type: "string", description: "Optional context pack. Applies pack libraryRules; still invent/deprecated/unresolved only." },
+        product: { type: "string" },
+        journey: { type: "string" },
+        domain: { type: "string" },
       },
     },
   },
   {
     name: "list_recipes",
     description:
-      "List screen recipes (composition packs). When a graph is ingested, slots bind to live masters (fill or suggest figmaNodeIds from recommend). Overlay .graphify/recipes.json still wins. Unbound slots include the next recommend query. Never invents node ids. Next: recipe \"<id or intent>\". Do not Read graph.json.",
+      "List screen recipes (composition packs). When a graph is ingested, slots bind to live masters (fill or suggest figmaNodeIds from recommend). Overlay .graphify/recipes.json still wins. Matching product+journey context packs (.graphify/context-packs.json) scope slot fills and nextRecommend. Unbound slots include the next recommend query. Never invents node ids. Next: recipe \"<id or intent>\". Do not Read graph.json.",
     inputSchema: {
       type: "object",
-      properties: { ...graphIdProperty },
+      properties: {
+        ...graphIdProperty,
+        pack: { type: "string", description: "Context pack id to bind while listing." },
+        product: { type: "string" },
+        journey: { type: "string" },
+        domain: { type: "string" },
+      },
     },
   },
   {
     name: "recipe",
     description:
-      "Get a screen recipe by id, title, or intent. After ingest, slots resolve against live masters (overlay .graphify/recipes.json still wins). Unbound slots include the next recommend query. Never invents node ids. After placing: verify_frame. Do not Read graph.json.",
+      "Get a screen recipe by id, title, or intent. After ingest, slots resolve against live masters (overlay .graphify/recipes.json still wins). Matching product+journey context pack scopes slot fills and nextRecommend. Unbound slots include the next recommend query. Never invents node ids. After placing: verify_frame. Do not Read graph.json.",
     inputSchema: {
       type: "object",
       properties: {
@@ -185,6 +203,10 @@ export const TOOLS: ToolDefinition[] = [
           type: "string",
           description: "Optional extra brief mixed into unbound-slot ranking (same path as recommend).",
         },
+        pack: { type: "string", description: "Context pack id. Else pack bound via recipeIds / contextPackId / active." },
+        product: { type: "string" },
+        journey: { type: "string" },
+        domain: { type: "string" },
       },
       required: ["query"],
     },
@@ -205,6 +227,10 @@ export const TOOLS: ToolDefinition[] = [
           type: "string",
           description: "Optional extra brief mixed into unbound-slot ranking.",
         },
+        pack: { type: "string" },
+        product: { type: "string" },
+        journey: { type: "string" },
+        domain: { type: "string" },
       },
       required: ["query"],
     },
@@ -350,6 +376,16 @@ function libraryRulesFromArgs(args: Record<string, unknown>) {
   }
 }
 
+function contextBindFromArgs(args: Record<string, unknown>) {
+  return loadContextBind({
+    pack: typeof args["pack"] === "string" ? args["pack"] : undefined,
+    product: typeof args["product"] === "string" ? args["product"] : undefined,
+    journey: typeof args["journey"] === "string" ? args["journey"] : undefined,
+    domain: typeof args["domain"] === "string" ? args["domain"] : undefined,
+    packsFile: typeof args["packsFile"] === "string" ? args["packsFile"] : undefined,
+  });
+}
+
 function context(args: Record<string, unknown>) {
   const graphId = typeof args["graphId"] === "string" ? args["graphId"] : undefined;
   const resolved = resolveGraph(graphId);
@@ -430,6 +466,7 @@ function dispatchTool(name: string, args: Record<string, unknown>): unknown {
       const budget = typeof args["budgetChars"] === "number" ? args["budgetChars"] : undefined;
       return recommendMasters(index, asString(args["intent"] ?? args["question"] ?? args["query"], "intent"), {
         budgetChars: budget,
+        context: packForRecommend(contextBindFromArgs(args)),
       });
     }
 
@@ -449,12 +486,13 @@ function dispatchTool(name: string, args: Record<string, unknown>): unknown {
         frame,
         components,
         rules: libraryRulesFromArgs(args),
+        context: packForRecommend(contextBindFromArgs(args)),
       });
     }
 
     case "list_recipes": {
       const graphId = typeof args["graphId"] === "string" ? args["graphId"] : undefined;
-      return listRecipes(loadRecipes(), resolveGraph(graphId)?.index);
+      return listRecipes(loadRecipes(), resolveGraph(graphId)?.index, contextBindFromArgs(args));
     }
 
     case "recipe":
@@ -466,7 +504,7 @@ function dispatchTool(name: string, args: Record<string, unknown>): unknown {
       const intent = typeof args["intent"] === "string" ? args["intent"].trim() : "";
       const extra = intent && intent !== query ? intent : undefined;
       const graphId = typeof args["graphId"] === "string" ? args["graphId"] : undefined;
-      return recipeCard(loadRecipes(), query, resolveGraph(graphId)?.index, extra);
+      return recipeCard(loadRecipes(), query, resolveGraph(graphId)?.index, extra, contextBindFromArgs(args));
     }
 
     case "list_graphs": {

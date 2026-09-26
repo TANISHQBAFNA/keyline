@@ -7,7 +7,9 @@ import {
   clearCache,
   graphPath,
   listGraphs,
+  loadContextBind,
   loadGraph,
+  readContextPacks,
   saveGraph,
   storeRoot,
 } from "@/server/store";
@@ -43,5 +45,31 @@ describe("store", () => {
     expect(loadGraph()?.graph.fileKey).toBe(graph.fileKey);
     expect(listGraphs()).toHaveLength(1);
     expect(summary.nodes).toBe(graph.nodes.length);
+  });
+
+  it("loads product+journey context packs from context-packs.json", () => {
+    writeFileSync(
+      join(dir, "context-packs.json"),
+      JSON.stringify({
+        active: "storefront-checkout-summary",
+        packs: [
+          {
+            id: "storefront-checkout-summary",
+            product: "Storefront",
+            domain: "checkout",
+            journey: "summary",
+            recipeIds: ["checkout-summary"],
+            figmaNodeId: "do-not-keep",
+          },
+        ],
+      }),
+    );
+    const file = readContextPacks();
+    expect(file.active).toBe("storefront-checkout-summary");
+    expect(file.packs[0]?.domain).toBe("checkout");
+    expect(file.packs[0] && "figmaNodeId" in file.packs[0]).toBe(false);
+    const bind = loadContextBind();
+    expect(bind.active).toBe("storefront-checkout-summary");
+    expect(bind.packs).toHaveLength(1);
   });
 });
