@@ -26,23 +26,26 @@ Use Resolve before any Figma screen build or design-from-brief work.
 
 ```bash
 npm run build:server
-npm run resolve -- ingest '<figma-url>'    # re-run if the library changed
+npm run resolve -- ingest '<figma-url>' --role library   # re-run if that file changed
+npm run resolve -- ingest '<product-url>' --role product
 npm run resolve -- recipe list             # after ingest, slots bind to live ids
 npm run resolve -- recipe "checkout summary"
 npm run resolve -- recommend "checkout with primary button"   # unbound slots only
 # place ONLY the returned figmaNodeIds (use_figma / get_design_context)
 npm run resolve -- verify "Checkout Summary"
+npm run resolve -- cousins "Checkout Summary"   # when a library + product file are linked
 ```
 
 | Step | When | Tool |
 |------|------|------|
-| 1. Ingest | No graph, or Figma library changed | `ingest '<url>'` |
-| 2. Context / recipe | Screen job matches a pack (checkout, sign-in, empty state, …). Optional `.graphify/context-packs.json` scopes product + journey + domain | `recipe list` then `recipe "<job>"` (optional `--pack` / `--product` / `--journey` / `--domain`) |
-| 3. Recommend | Slot is unbound / missing / deprecated | `recommend "<nextRecommend>"` (optional `--pack` / `--product` / `--journey` / `--domain`) |
-| 4. Place | Drawing in Figma | returned `figmaNodeId`s **only** |
+| 1. Ingest | No graph, or a linked Figma file changed | `ingest '<url>'` (`--role library\|product\|client`). Each linked file as needed. |
+| 2. Context / recipe | Screen job matches a pack (checkout, sign-in, empty state, …). Optional `.graphify/context-packs.json` scopes product + journey + domain. Packs may name `files` and optional `client`. | `recipe list` then `recipe "<job>"` (optional `--pack` / `--product` / `--journey` / `--domain`) |
+| 3. Recommend | Slot is unbound / missing / deprecated. Prefers DS library masters when workspace has a library-role file. | `recommend "<nextRecommend>"` (optional `--pack` / `--product` / `--journey` / `--domain`) |
+| 4. Place | Drawing in Figma | returned `figmaNodeId`s **only** (cards also stamp `fileKey`) |
 | 5. Verify | After the draw | `verify_frame` on the frame or placed names (optional `--pack` / `--product` / `--journey` / `--domain`) |
+| 6. Cousins | Multi-file workspace exists (library + product/client) | `cousins` / `check_cousins` on the product frame or `--job` |
 
-MCP: `list_recipes` → `recipe` → `recommend` → Figma → `verify_frame`.
+MCP: `list_recipes` → `recipe` → `recommend` → Figma → `verify_frame` → `check_cousins` when a library file is linked.
 
 ### Forbidden
 
@@ -52,7 +55,7 @@ MCP: `list_recipes` → `recipe` → `recommend` → Figma → `verify_frame`.
 - `get_design_context` / `use_figma` on a FRAME or SECTION until recipe/recommend/resolve returned that id.
 - Skip ingest when the library changed. Re-ingest is the refresh path.
 
-`.graphify/recipes.json` overlay still wins over the starter pack. Optional `.graphify/context-packs.json` binds product + journey + domain to recipes so recommend is not a generic name match. Do not invent `defaultMasterId`s or Figma node ids in packs. See `docs/RECIPES.md`.
+`.graphify/recipes.json` overlay still wins over the starter pack. Optional `.graphify/context-packs.json` binds product + journey + domain to recipes so recommend is not a generic name match. Optional `.graphify/workspace.json` lists linked Figma files (`library` / `product` / `client`). Do not invent `defaultMasterId`s or Figma node ids in packs. See `docs/GUIDE.md` and `docs/RECIPES.md`.
 
 Prefer **resolve** over any `keyline` / `graphify` alias.
 

@@ -641,6 +641,10 @@ export function buildGraph(doc: SourceDocument, options: BuildGraphOptions = {})
     builder.addEdge("PARENT_OF", edge.target, edge.source, "has parent", { derived: true });
   }
 
+  for (const node of builder.nodes.values()) {
+    if (!node.fileKey) node.fileKey = doc.fileKey;
+  }
+
   return {
     fileKey: doc.fileKey,
     fileName: doc.fileName,

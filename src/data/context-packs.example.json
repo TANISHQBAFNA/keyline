@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "howToAdd": "Copy this file to .graphify/context-packs.json. Fill in your product, the journey step (for example checkout summary), and who the screen is for. Bind recipeIds to recipes you already have — use the recipe id (checkout-summary), not the title. Never add Figma component ids; recommend fills those after ingest. Set active to the pack agents should load by default.",
+  "howToAdd": "Copy this file to .graphify/context-packs.json. Fill in your product, the journey step (for example checkout summary), and who the screen is for. Bind recipeIds to recipes you already have — use the recipe id (checkout-summary), not the title. Optional files lists product/client workspace labels or keys. Optional client when product ≠ client. Never add Figma component ids; recommend fills those after ingest. Set active to the pack agents should load by default.",
   "active": "storefront-checkout-summary",
   "packs": [
     {
@@ -11,6 +11,8 @@
       "audience": "returning shopper",
       "constraints": { "density": "compact", "a11y": "wcag-aa" },
       "recipeIds": ["checkout-summary"],
+      "files": ["Storefront"],
+      "client": { "id": "northwind", "name": "Northwind" },
       "libraryRules": { "deny": ["Banner"] }
     }
   ]

@@ -47,12 +47,14 @@ npm run resolve -- ingest '<figma-file-or-design-url>'
 Forced path. Agent does not invent components. Cards stay the interface — **do not** `Read` `.graphify/graph.json`.
 
 ```bash
-npm run resolve -- ingest '<figma-url>'    # re-run if the library changed
+npm run resolve -- ingest '<figma-url>' --role library    # re-run if that file changed
+npm run resolve -- ingest '<product-url>' --role product
 npm run resolve -- recipe list
 npm run resolve -- recipe "checkout summary"
 npm run resolve -- recommend "checkout summary with primary button and input"
 npm run resolve -- verify "Checkout Summary"
 npm run resolve -- verify --components "Button,MadeUpCard"
+npm run resolve -- cousins "Checkout Summary"
 ```
 
 After ingest, `recipe list` / `recipe "<job>"` bind slots to live `figmaNodeId`s. Overlay `.graphify/recipes.json` still wins. Unbound slots include the next `recommend` query. Bound ids that are missing or deprecated are flagged.
@@ -70,16 +72,17 @@ Use the card + `figmaNodeId`. Prefer **resolve** over any keyline / graphify ali
 
 Optional allow/deny file: `.graphify/library-rules.json` with `{ "allow": [...], "deny": [...] }`. If missing, approved = in-graph master and not deprecated.
 
-Designers add screen packs in JSON — see [`docs/RECIPES.md`](RECIPES.md). Overlay: `.graphify/recipes.json`. Product + journey + domain: `.graphify/context-packs.json`.
+Designers add screen packs in JSON — see [`docs/RECIPES.md`](RECIPES.md). Overlay: `.graphify/recipes.json`. Product + journey + domain: `.graphify/context-packs.json`. Linked files: `.graphify/workspace.json` (see [GUIDE.md](GUIDE.md)).
 
 ## Everyday screen flow
 
-1. **Ingest** — (refresh) store the library
-2. **Context / recipe** — (optional) named pack for the screen job; optional product + journey + domain context pack (`--pack` / `--product` / `--journey` / `--domain`)
-3. **Recommend** — unbound slots / free-text brief → ranked masters (context-scoped when a pack is bound; same flags)
-4. **Draw** — `use_figma` / `get_design_context` on those `figmaNodeId`s only
+1. **Ingest** — (refresh) each linked file (`--role library|product|client`)
+2. **Context / recipe** — (optional) named pack for the screen job; optional product + journey + domain context pack (`--pack` / `--product` / `--journey` / `--domain`). Packs may name `files` / `client`.
+3. **Recommend** — unbound slots / free-text brief → ranked masters (library preferred when a library-role file is linked; context-scoped when a pack is bound)
+4. **Draw** — `use_figma` / `get_design_context` on those `figmaNodeId`s only (cards stamp `fileKey`)
 5. **Verify** — invents / deprecated / unresolved (same optional `--pack` / `--product` / `--journey` / `--domain`)
-6. **Human taste** — review before expanding scope
+6. **Cousins** — when a library + product/client file are linked (`cousins` / `check_cousins`)
+7. **Human taste** — review before expanding scope
 
 **Do not** `Read` `.graphify/graph.json`. Resolve cards are the cheap path.
 

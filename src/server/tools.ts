@@ -18,13 +18,14 @@ import {
   usageSummaryFor,
   verifyFrame,
   withCost,
+  checkCousins,
   packForRecommend,
   type GraphIndex,
   type GraphLevel,
   type ViewMode,
 } from "@/core/query";
 import { buildAiGraphContext, toMarkdownPrompt } from "@/core/ai";
-import { listGraphs, loadContextBind, loadRecipes, readLibraryRules, resolveGraph } from "./store";
+import { listGraphs, loadContextBind, loadRecipes, readLibraryRules, readWorkspace, resolveGraph } from "./store";
 
 /**
  * Optional MCP tools. Agents: recommend / recipe / resolve / verify_frame / check_frame.
@@ -67,6 +68,28 @@ export const TOOLS: ToolDefinition[] = [
         budgetChars: { type: "number", description: "Hard cap on JSON chars. Default 2000." },
       },
       required: ["intent"],
+    },
+  },
+  {
+    name: "check_cousins",
+    description:
+      "Wrong-cousin report for a product/client frame or placed names. Same role or weak name as a shared DS library master, but a different master family / file. Needs a library-role file in .graphify/workspace.json. Unsure rows refuse to guess. Never invents a master. Do not Read graph.json.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...graphIdProperty,
+        frame: { type: "string", description: "Product/client frame name, graph id, or figmaNodeId." },
+        components: {
+          type: "array",
+          items: { type: "string" },
+          description: "Placed component names or ids.",
+        },
+        job: { type: "string", description: "Screen job, e.g. \"checkout summary\". Uses the matching recipe for role." },
+        pack: { type: "string" },
+        product: { type: "string" },
+        journey: { type: "string" },
+        domain: { type: "string" },
+      },
     },
   },
   {
@@ -412,6 +435,7 @@ const brief = (node: GraphNode) => ({
   name: node.name,
   type: node.type,
   figmaNodeId: node.figmaNodeId,
+  ...(node.fileKey ? { fileKey: node.fileKey } : {}),
   status: node.status,
   owner: node.owner,
 });
@@ -464,9 +488,30 @@ function dispatchTool(name: string, args: Record<string, unknown>): unknown {
     case "recommend": {
       const { index } = context(args);
       const budget = typeof args["budgetChars"] === "number" ? args["budgetChars"] : undefined;
+      const bind = contextBindFromArgs(args);
       return recommendMasters(index, asString(args["intent"] ?? args["question"] ?? args["query"], "intent"), {
         budgetChars: budget,
-        context: packForRecommend(contextBindFromArgs(args)),
+        context: packForRecommend(bind),
+        workspace: bind.workspace,
+      });
+    }
+
+    case "check_cousins": {
+      const graphId = typeof args["graphId"] === "string" ? args["graphId"] : undefined;
+      const bind = contextBindFromArgs(args);
+      const frame = typeof args["frame"] === "string" ? args["frame"] : undefined;
+      const components = asStringList(args["components"]);
+      const job = typeof args["job"] === "string" ? args["job"] : undefined;
+      if (!frame && !components && !job) {
+        throw new ToolError("`frame`, `components`, or `job` is required.");
+      }
+      return checkCousins(resolveGraph(graphId)?.index, {
+        frame,
+        components,
+        job,
+        recipes: loadRecipes(),
+        context: packForRecommend(bind),
+        workspace: bind.workspace ?? readWorkspace(),
       });
     }
 
@@ -512,8 +557,8 @@ function dispatchTool(name: string, args: Record<string, unknown>): unknown {
       return {
         graphs,
         hint: graphs.length
-          ? "Call list_recipes or recipe \"<job>\", then recommend unbound slots, Figma on returned figmaNodeIds, then verify_frame. Do not Read graph.json."
-          : "Nothing stored yet. Ingest a Figma URL or JSON export first. list_recipes still works without a graph.",
+          ? "Call list_recipes or recipe \"<job>\", then recommend unbound slots, Figma on returned figmaNodeIds (fileKey + id), then verify_frame. Multi-file workspace: check_cousins on the product frame. Do not Read graph.json."
+          : "Nothing stored yet. Ingest a Figma URL or JSON export first (DS library --role library, then product files). list_recipes still works without a graph.",
       };
     }
 

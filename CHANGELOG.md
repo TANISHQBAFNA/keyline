@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — multi-file workspace + wrong-cousin report
+
+One shared design system is the system of record. Resolve holds one knowledge workspace, not one giant Figma file.
+
+- **Workspace** — designer JSON at `.graphify/workspace.json` (template: `src/data/workspace.example.json`). Files list: role `library` | `product` | `client`, key/url, label. `ingest --role` writes it. Per-file graphs in `.graphify/files/`.
+- **Provenance** — every master/node card stamps `fileKey` + `figmaNodeId` (ids collide across files).
+- **Remote stubs** — when the library file is ingested, remotes link to that FILE (and to the real master on exact id/key match), not only the synthetic “source unknown” bucket.
+- **Recommend** — prefers DS library masters when a library-role file is linked. Context packs may name `files` and optional `client` (same pack schema).
+- **Wrong cousin** — CLI `resolve cousins` + MCP `check_cousins`. Same role / weak name, different master family than the shared DS. Unsure → says so. Never invents a master.
+- **Guide** — [docs/GUIDE.md](docs/GUIDE.md) how to add the library + product files and run the cousin check. Happy path still never `Read` graph.json.
+
 ## Unreleased — designer guide
 
 Plain-language how-to for designers and product people: [`docs/GUIDE.md`](docs/GUIDE.md). README points there first. Context-pack example `howToAdd` clarified. Technical pages keep a one-line pointer. Agent docs and `verify --help` list `--pack` / `--product` / `--journey` / `--domain` (same flags the CLI actually reads).

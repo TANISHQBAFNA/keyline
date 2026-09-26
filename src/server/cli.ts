@@ -8,7 +8,7 @@ import {
   fetchFigmaRestDocument,
   figmaAccessToken,
 } from "@/core/ingestion/adapters/figmaRestSource";
-import { isFigmaLiveTarget, parseFigmaTarget } from "@/core/ingestion/figmaFileKey";
+import { isFigmaLiveTarget } from "@/core/ingestion/figmaFileKey";
 import { buildGraph } from "@/core/transform";
 import {
   buildOrientBrief,
@@ -20,11 +20,27 @@ import {
   pathBetween,
   queryQuestion,
   recipeCard,
+  checkCousins,
+  describeRole,
   recommendMasters,
   toGraphReportMarkdown,
   verifyFrame,
+  type WorkspaceFileRole,
 } from "@/core/query";
-import { deleteGraph, graphIdFor, graphPath, listGraphs, loadContextBind, loadRecipes, readLibraryRules, rebuildIndex, resolveGraph, saveGraph, storeRoot } from "./store";
+import {
+  deleteGraph,
+  graphPath,
+  listGraphs,
+  loadContextBind,
+  loadRecipes,
+  readLibraryRules,
+  readWorkspace,
+  rebuildIndex,
+  resolveGraph,
+  saveIngestedFile,
+  storeRoot,
+  workspacePath,
+} from "./store";
 
 /**
  * Resolve CLI — ingest once into `.graphify/graph.json`.
@@ -41,12 +57,13 @@ function usage(): void {
     [
       "Resolve — Figma rules. Agents resolve.",
       "",
-      "  resolve ingest <file.json | figma-url | file-key> [--id <graphId>] [--file-key <key>] [--name <fileName>] [--scope node|screens|file]",
-      "      Build a graph and store it. JSON: plugin export, REST body, MCP capture, or a graph.",
+      "  resolve ingest <file.json | figma-url | file-key> [--id <graphId>] [--file-key <key>] [--name <fileName>] [--scope node|screens|file] [--role library|product|client] [--label <name>]",
+      "      Build a graph and add it to the workspace. JSON: plugin export, REST body, MCP capture, or a graph.",
       "      Live Figma: pass the shared screen/frame/section URL (node-id in the link).",
       "      No node-id → each top-level screen, one request at a time. --scope file = whole dump.",
-      "      Token from FIGMA_ACCESS_TOKEN. Writes .graphify/graph.json — agents call resolve, do not Read that file.",
-      "      Re-run ingest to refresh the library before recommend / verify_frame.",
+      "      Token from FIGMA_ACCESS_TOKEN. Writes .graphify/files/<key>.json + workspace.json.",
+      "      First file defaults to role library; later files default to product. Re-run to refresh.",
+      "      Agents call resolve / cousins — do not Read graph.json.",
       "",
       `  resolve recipe [list | "<name or intent>"] [--id] [--intent "<brief>"] ${PACK_BIND_FLAGS}`,
       "      Screen packs. Overlay .graphify/recipes.json still wins.",
@@ -61,7 +78,11 @@ function usage(): void {
       `  resolve verify "<frame>" [--id] [--components a,b] [--rules <file>] ${PACK_BIND_FLAGS}`,
       "      After drawing: pass/fail, invents, deprecated, unresolved. Measures invent rate.",
       "      Optional .graphify/library-rules.json { allow, deny }. Else in-graph + not deprecated = approved.",
-      "      Same pack flags as recommend. Pack libraryRules are a light hook — not a cross-product cousin report.",
+      "      Same pack flags as recommend. Pack libraryRules are a light hook. Wrong-cousin drift: resolve cousins.",
+      `  resolve cousins ["<frame>"] [--job "<screen job>"] [--components a,b] ${PACK_BIND_FLAGS}`,
+      "      Wrong-cousin report: same role / weak name, different master family than the shared DS library.",
+      "      Needs a library-role file in .graphify/workspace.json. Unsure → says so. Never invents a master.",
+      "  resolve workspace              List linked Figma files (library / product / client)",
       "  resolve orient [--id <graphId>]     Optional god-node summary. Prefer recommend / resolve.",
       "  resolve query \"<question>\" [--id] [--budget <chars>]",
       "      Optional scoped subgraph. Agents should recommend or resolve a component instead.",
@@ -120,16 +141,29 @@ function toGraph(payload: unknown, args: string[]): DesignGraph {
   );
 }
 
-function writeStored(graph: DesignGraph, graphId?: string): void {
-  const summary = saveGraph(graph, graphId);
+function ingestRole(args: string[]): WorkspaceFileRole | undefined {
+  const named = flag(args, "role");
+  if (named === "library" || named === "product" || named === "client") return named;
+  return undefined;
+}
+
+function writeStored(graph: DesignGraph, args: string[], target?: string): void {
+  const summary = saveIngestedFile(graph, {
+    graphId: flag(args, "id"),
+    role: ingestRole(args),
+    url: target && /^https?:\/\//.test(target) ? target : flag(args, "url"),
+    label: flag(args, "label") ?? flag(args, "name"),
+  });
   process.stdout.write(
     [
       `Stored ${summary.graphId}`,
       `  file      ${summary.fileName} (${summary.fileKey})`,
+      summary.role ? `  role      ${summary.role} — ${describeRole(summary.role)}` : "",
       `  source    ${summary.sourceKind}`,
       `  graph     ${summary.nodes} nodes, ${summary.edges} edges`,
       summary.warnings ? `  warnings  ${summary.warnings}` : "",
       `  entry     ${summary.entryPoints.map((entry) => entry.name).join(", ") || "(none)"}`,
+      `  workspace ${workspacePath()}`,
       `  graph     ${graphPath()}`,
       "",
     ]
@@ -150,7 +184,6 @@ async function ingestLive(target: string, args: string[]): Promise<void> {
   if (!token) {
     throw new Error("Set FIGMA_ACCESS_TOKEN to ingest a live Figma file.");
   }
-  const parsed = parseFigmaTarget(target);
   const document = await fetchFigmaRestDocument(target, {
     token,
     scope: ingestScope(args),
@@ -163,11 +196,7 @@ async function ingestLive(target: string, args: string[]): Promise<void> {
       process.stderr.write(`  ${info.done}/${info.total} ${info.name}\n`);
     },
   });
-  const nodeSlug = parsed.nodeIds[0]?.replace(/:/g, "-");
-  const graphId =
-    flag(args, "id") ??
-    (nodeSlug ? graphIdFor(document.fileKey, `${document.fileName}-${nodeSlug}`) : undefined);
-  writeStored(buildGraph(document), graphId);
+  writeStored(buildGraph(document), args, target);
 }
 
 function requireGraph(args: string[]) {
@@ -218,7 +247,7 @@ async function main(argv: string[]): Promise<void> {
       const resolved = resolve(target);
       if (existsSync(resolved)) {
         const payload = JSON.parse(readFileSync(resolved, "utf8"));
-        writeStored(toGraph(payload, args), flag(args, "id"));
+        writeStored(toGraph(payload, args), args, target);
         return;
       }
 
@@ -251,10 +280,12 @@ async function main(argv: string[]): Promise<void> {
       const intent = positionals(args)[0];
       if (!intent) throw new Error('Usage: resolve recommend "<intent>"');
       const budget = Number(flag(args, "budget"));
+      const bind = bindFromFlags(args);
       printJson(
         recommendMasters(requireGraph(args).index, intent, {
           budgetChars: Number.isFinite(budget) && budget > 0 ? budget : undefined,
-          context: packForRecommend(bindFromFlags(args)),
+          context: packForRecommend(bind),
+          workspace: bind.workspace,
         }),
       );
       return;
@@ -315,6 +346,55 @@ async function main(argv: string[]): Promise<void> {
       return;
     }
 
+    case "cousins":
+    case "cousin": {
+      const frame = positionals(args)[0];
+      const componentsRaw = flag(args, "components");
+      const components = componentsRaw
+        ? componentsRaw
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean)
+        : undefined;
+      if (!frame && !components?.length && !flag(args, "job")) {
+        throw new Error(
+          `Usage: resolve cousins "<frame>" [--job "<screen job>"] [--components a,b] ${PACK_BIND_FLAGS}`,
+        );
+      }
+      const bind = bindFromFlags(args);
+      printJson(
+        checkCousins(resolveGraph(flag(args, "id"))?.index, {
+          frame,
+          components,
+          job: flag(args, "job"),
+          recipes: loadRecipes(),
+          context: packForRecommend(bind),
+          workspace: bind.workspace ?? readWorkspace(),
+        }),
+      );
+      return;
+    }
+
+    case "workspace": {
+      const workspace = readWorkspace();
+      if (!workspace.files.length) {
+        process.stdout.write(
+          "No workspace files yet. Ingest the shared DS with --role library, then product/client files. Or copy src/data/workspace.example.json to .graphify/workspace.json.\n",
+        );
+        return;
+      }
+      printJson({
+        workspace: workspace.files.map((file) => ({
+          role: file.role,
+          key: file.key,
+          label: file.label,
+          url: file.url,
+        })),
+        hint: "Ingest each linked file. Cards stamp fileKey + figmaNodeId. Then recipe → recommend → place those ids → verify. Run cousins on a product frame to catch wrong-cousin drift. Do not Read graph.json.",
+      });
+      return;
+    }
+
     case "verify": {
       const frame = positionals(args)[0];
       const componentsRaw = flag(args, "components");
@@ -351,7 +431,7 @@ async function main(argv: string[]): Promise<void> {
       }
       for (const entry of graphs) {
         process.stdout.write(
-          `${entry.graphId}\n  ${entry.fileName} · ${entry.nodes} nodes · ${entry.edges} edges · ${entry.sourceKind}\n`,
+          `${entry.graphId}\n  ${entry.fileName} · ${entry.role ?? "file"} · ${entry.nodes} nodes · ${entry.edges} edges · ${entry.sourceKind}\n`,
         );
       }
       return;

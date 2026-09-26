@@ -4,13 +4,13 @@
 
 This is the guide to start with if you set Figma library rules and want AI agents to pick the right components.
 
-You do not need to read the code. You need a Figma library, a short list of screen packs, and (when one library serves more than one product) a context pack that says *this product* and *this step in the journey*.
+You do not need to read the code. You need a Figma library, a short list of screen packs, and (when one library serves more than one product) a context pack that says *this product* and *this step in the journey*. If that library is used in more than one Figma file, you also list those files in one Resolve **workspace**.
 
 ---
 
 ## What Resolve is
 
-Resolve is one shared **design system brain** for your Figma library.
+Resolve is one shared **design system brain**. It is one knowledge workspace — not one giant Figma file. The shared library file is the system of record. Product and client files sit next to it.
 
 You already have main components in Figma — a Primary button, an Input, a checkout card. Agents are good at drawing screens. They are also good at inventing a new button every time.
 
@@ -22,7 +22,7 @@ Think of it as a map of what already exists, plus a few rules you write in plain
 
 ## Who it is for
 
-**You (designer or product).** You decide which masters may be used, which screen jobs exist (checkout summary, sign-in, empty state), and — if several products share one library — which product and journey step this screen belongs to.
+**You (designer or product).** You decide which masters may be used, which screen jobs exist (checkout summary, sign-in, empty state), which Figma files belong in the workspace (shared library, product, client), and — if several products share one library — which product and journey step this screen belongs to.
 
 **The AI agent.** It builds the screen in Figma. It must use the component ids Resolve returns. It must not invent a new system.
 
@@ -65,7 +65,11 @@ For clone flags, tokens, and the optional browser map, see [For developers](../R
 
 **Verify.** After the draft, Resolve checks the frame. It flags pieces that were invented, pieces marked retired in the library, and pieces it cannot match. It does **not** say the layout is beautiful. That is still you.
 
-**Figma component id.** The address of that master in your file. Agents place that exact component. They must not make up an id.
+**Figma component id.** The address of that master in a file (`figmaNodeId`). Across files those ids can repeat, so every card also stamps the **file key**. Agents place that exact component in that file. They must not make up an id.
+
+**Workspace.** The list of Figma files Resolve knows about for this project — usually one shared design-system library plus the product (and maybe client) files that use it. You edit `.graphify/workspace.json`, or ingest with `--role library` / `--role product` / `--role client` and Resolve writes it.
+
+**Wrong cousin.** Same job or a similar name, but not the library master the shared DS expects. Example: a product file used a one-off button instead of the library Primary. Resolve reports that. It does not invent a replacement master.
 
 ---
 
@@ -75,17 +79,26 @@ Use a checkout summary as the running example. Swap the words for your screen.
 
 ### 1. Refresh the library (ingest)
 
-Paste a **screen or frame** link, not the whole file unless you really want that.
+Paste a **screen or frame** link, not the whole file unless you really want that. First file is the shared design system (or pass `--role library`). Then ingest each product or client file.
 
 ```bash
-npm run resolve -- ingest 'https://www.figma.com/design/…?node-id=…'
+npm run resolve -- ingest 'https://www.figma.com/design/…?node-id=…' --role library --label "Shared DS"
+npm run resolve -- ingest 'https://www.figma.com/design/…?node-id=…' --role product --label "Storefront"
 ```
 
-Or ask the agent: “Ingest this Figma frame into Resolve.”
+Or ask the agent: “Ingest this Figma frame into Resolve as the library.” Then: “Ingest the Storefront file as a product file.”
 
-**You get:** Resolve now knows the masters in that file. If ingest fails on a live `figma.com` link from the command line, you need a Figma access token, or ingest through the Figma connection / plugin export instead (see troubleshooting).
+**You get:** Resolve now knows the masters in those files. Cards stamp **file key + Figma component id**. If the product file used a library component, Resolve links that stub to the ingested library file — not only a “source unknown” bucket.
 
-Re-run this step after you add, rename, or retire components in Figma.
+If ingest fails on a live `figma.com` link from the command line, you need a Figma access token, or ingest through the Figma connection / plugin export instead (see troubleshooting). You do **not** need a live token to merge files that are already ingested (tests and fixtures work without one).
+
+Re-run ingest for a file after you add, rename, or retire components in that file.
+
+To see what is linked:
+
+```bash
+npm run resolve -- workspace
+```
 
 ### 2. See the screen packs (recipes)
 
@@ -153,7 +166,18 @@ npm run resolve -- verify "Checkout Summary" --product Storefront --journey summ
 
 **You get:** Pass or fail. Invented names (like `MadeUpCard`) fail. Retired masters fail. Pieces Resolve cannot match fail. You then judge taste in Figma.
 
-### 6. You review
+### 6. Check for the wrong cousin (when more than one file is linked)
+
+If the workspace has a library file and a product or client file, ask Resolve whether the draft used a lookalike from the wrong family:
+
+```bash
+npm run resolve -- cousins "Checkout Summary"
+npm run resolve -- cousins "Checkout Summary" --job "checkout summary" --pack storefront-checkout-summary
+```
+
+**You get:** A short card. `cousins` are placed pieces that match a role or a weak name but are not the library master. `unsure` means Resolve will not guess. An empty cousin list with `ok` placements means the draft used the shared DS. It still does not judge taste.
+
+### 7. You review
 
 Resolve is not the taste judge. If the Primary button is the right master but the spacing is wrong, that is a Figma note for the agent — not a Resolve bug.
 
@@ -170,10 +194,12 @@ When Resolve is connected, the agent can call the same steps by name:
 | `recommend` | Rank live masters for a brief; you can name a pack, or the product, journey step, and domain |
 | `resolve` | Look up a master you already know by name (for example `"Main Card"`) |
 | `verify_frame` | Check the drawn frame or the placed names; same optional pack / product / journey / domain |
+| `check_cousins` | After a multi-file workspace exists: flag lookalikes that are not the shared DS master |
+| `list_graphs` | Linked files (library / product / client) and their sizes |
 
 On the Figma side, the agent may open a component **only after** one of those cards returned its id. Everyday names for that are `use_figma` and `get_design_context`.
 
-You do not need to memorize this table. If the agent follows this repo’s Resolve instructions, it already has the order: ingest → recipe → recommend open slots → place returned ids → verify.
+You do not need to memorize this table. If the agent follows this repo’s Resolve instructions, it already has the order: ingest each linked file → recipe → recommend open slots → place returned ids → verify → cousin check when a library + product file are linked.
 
 ---
 
@@ -202,6 +228,8 @@ A filled-in file looks like this:
       "audience": "returning shopper",
       "constraints": { "density": "compact", "a11y": "wcag-aa" },
       "recipeIds": ["checkout-summary"],
+      "files": ["Storefront"],
+      "client": { "id": "northwind", "name": "Northwind" },
       "libraryRules": { "deny": ["Banner"] }
     }
   ]
@@ -228,7 +256,56 @@ A filled-in file looks like this:
 
 **`libraryRules` (optional).** A small allow / deny list of **component names**. `"deny": ["Banner"]` means “do not pick Banner for this pack.” Same idea as the optional `.graphify/library-rules.json` file.
 
+**`files` (optional).** Which product or client file(s) this pack applies to. Use the **file key** or the **label** from `.graphify/workspace.json` (`Storefront`). This does not invent masters. Recommend still prefers the shared DS library when a library-role file is linked.
+
+**`client` (optional).** When the product name and the client name are not the same. Same shape as `product` — `{ "id": "northwind", "name": "Northwind" }` or a string `"Northwind"`. Same pack, not a second model.
+
 Unknown extra keys are ignored. Invented Figma ids in this file are ignored. That is on purpose — this file is for product and journey, not for drawing.
+
+---
+
+## How to add the design-system library and product files
+
+One shared design system is the system of record. Product files (and client files, when those are separate) are linked next to it.
+
+### Option A — ingest writes the list
+
+```bash
+npm run resolve -- ingest '<library-url>' --role library --label "Shared DS"
+npm run resolve -- ingest '<product-url>' --role product --label "Storefront"
+```
+
+First ingest with no `--role` is treated as the library. Later ingests default to product. You can change a role by editing the JSON.
+
+### Option B — write the list yourself
+
+1. Copy [`src/data/workspace.example.json`](../src/data/workspace.example.json) to **`.graphify/workspace.json`**.
+2. Put one object per file: `role` (`library` | `product` | `client`), `key` (the Figma file key in the URL), optional `url` and `label`.
+3. Ingest each file. Resolve stores that file’s knowledge and keeps the list.
+
+A filled-in file looks like this:
+
+```json
+{
+  "version": 1,
+  "files": [
+    {
+      "role": "library",
+      "key": "DsLibraryKey",
+      "url": "https://www.figma.com/design/DsLibraryKey/Shared-DS",
+      "label": "Shared DS"
+    },
+    {
+      "role": "product",
+      "key": "StorefrontKey",
+      "url": "https://www.figma.com/design/StorefrontKey/Storefront",
+      "label": "Storefront"
+    }
+  ]
+}
+```
+
+Never add Figma component ids here. Never `Read` `.graphify/graph.json` — cards already stamp `fileKey` and `figmaNodeId`.
 
 ---
 
@@ -252,13 +329,14 @@ You can add or replace screen packs in `.graphify/recipes.json`. Matching `id` r
 
 These are the rules you should expect every agent to obey. If it breaks them, stop and point it back here.
 
-1. **Place only returned ids.** Use the Figma component ids from recipe, recommend, or a named lookup. Never invent a component, a name, or an id.
+1. **Place only returned ids.** Use the Figma component ids from recipe, recommend, or a named lookup. Cards include the file key because ids repeat across files. Never invent a component, a name, or an id.
 2. **Never dump the whole file.** Do not paste the stored library map, a giant Figma export, or the whole page tree into chat. Short cards are the point.
 3. **Do not open a whole frame in Figma as a “design system”** until a card returned that frame’s id. Agents draw with masters, not by cloning a random section.
-4. **Re-ingest when the library changes.** Stale knowledge is how you get missing or retired masters.
+4. **Re-ingest when a linked file changes.** Stale knowledge is how you get missing or retired masters. Ingest each file that changed.
 5. **Empty recommend means stop.** Do not “helpfully” draw a new button.
 6. **Verify after the draft.** Invented, retired, and unmatched pieces must be visible.
-7. **You still own taste.** Spacing, copy, and whether the screen feels right stay human.
+7. **Cousin-check a multi-file workspace.** If a library file and a product/client file are linked, run `cousins` / `check_cousins`. Unsure means stop, not guess.
+8. **You still own taste.** Spacing, copy, and whether the screen feels right stay human.
 
 Optional allow / deny for the whole library: `.graphify/library-rules.json` with `{ "allow": ["Button"], "deny": ["Banner"] }`. If that file is missing, “approved” means: it is in the ingested library, and it is not retired.
 
@@ -269,8 +347,7 @@ Optional allow / deny for the whole library: `.graphify/library-rules.json` with
 Be honest with yourself and with agents:
 
 - **Not a Figma replacement.** You still design, comment, and ship in Figma.
-- **Not a multi-file design-system workspace yet.** It does not yet report “you used the wrong cousin from another product that shares this library.” That check is coming. Today, context packs plus deny lists are the lever you have.
-- **Not a designer UI for “why this component.”** You do not yet get a visual card that explains the pick. Ranking still happens; the explanation UI is coming.
+- **Not a designer UI for “why this component.”** You do not yet get a visual card that explains the pick. Ranking still happens; the explanation UI is coming. The cousin report is a short pass/fail card, not that UI.
 - **Does not create components.** Recipes and packs only point at masters that already exist.
 - **Does not stay live by itself.** Changing Figma does nothing until you ingest again.
 
@@ -281,6 +358,10 @@ Be honest with yourself and with agents:
 **Recommend comes back empty.** The library was not ingested, the words do not match any master, or the live matches are all retired. Re-ingest. Use names from your library (“Primary button”, not “CTA widget”). Do not invent a fallback.
 
 **The context pack does not seem to apply.** The file must live at `.graphify/context-packs.json` — the example under `src/data/` is only a template. `recipeIds` must be the recipe id (`checkout-summary`). Set `active`, or pass `--pack`, or pass the product, journey step, and domain. Then run `recipe "checkout summary"` again and look for the product and journey on the card.
+
+**Cousin check says no library file.** `.graphify/workspace.json` needs a file with `"role": "library"`, and that file must be ingested. Product-only workspaces cannot guess the shared DS.
+
+**Cousin check is unsure.** The name was too weak, or two library masters tied. Do not invent a master. Rename in Figma, re-ingest, or pass a tighter `--job` / pack.
 
 **Picks feel stale after a library change.** Re-run ingest. That is the refresh path. There is no silent live sync.
 
